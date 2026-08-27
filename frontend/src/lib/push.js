@@ -1,5 +1,7 @@
 // Web Push subscribe/unsubscribe — requires a signed-in profile (subscriptions are stored
 // server-side per user, same as everything else under /api).
+//
+// TODO (Milestone 6/7): Web Push endpoints /api/push/* will be decommissioned in favor of OS-level local scheduled notifications.
 import { api } from './api.js'
 
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window

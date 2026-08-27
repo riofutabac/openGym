@@ -12,6 +12,8 @@ import { Button } from '../components/ui.jsx'
 // Admin-only operator dashboard (owner passkey + admin flag; guarded again server-side).
 // Deliberately English-only — it isn't part of the translated end-user surface, so it stays
 // out of the per-language string packs.
+//
+// TODO (Milestone 7): retire this entire view when custom Node backend and /api/admin/* are removed.
 
 const rel = ts => {
   if (!ts) return 'never'
