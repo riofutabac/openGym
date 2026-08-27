@@ -1,0 +1,95 @@
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+*.jks
+*.keystore
+
+# Node & Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+.npm
+
+# Build & Bundler outputs
+dist/
+build/
+out/
+.output/
+.cache/
+.parcel-cache/
+.turbo/
+*.tsbuildinfo
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Logs
+logs/
+*.log
+
+# AI Assistants & Agent Caches
+.agents/
+.claude/
+skills-lock.json
+.gemini/
+
+# Mobile / Capacitor / Android / iOS
+local.properties
+.gradle/
+DerivedData/
+xcuserdata/
+App/Pods/
+App/build/
+App/output/
+App/App/public/
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/local.properties
+frontend/android/.cxx/
+frontend/android/captures/
+frontend/ios/DerivedData/
+frontend/ios/App/Pods/
+frontend/ios/App/build/
+frontend/ios/App/output/
+frontend/ios/App/App/public/
+frontend/ios/xcuserdata/
+
+# Temp
+tmp/
+temp/
+*.tmp
