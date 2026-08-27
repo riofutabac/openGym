@@ -2,33 +2,17 @@
 //
 // There is no backend: nothing to sign in to, everything lives on the phone. Unlike guest
 // mode in a browser, this is the user's only copy of their training log, so it can't depend
-// on WebView localStorage alone (iOS evicts that under storage pressure). Every persist()
-// therefore also lands in a JSON file in the app's private data directory, and boot()
-// restores from it. The workout reminder uses native local notifications scheduled per
-// planned weekday — no server involved, unlike Web Push in the self-hosted version.
+// on WebView localStorage alone (iOS evicts that under storage pressure). State persistence
+// is handled by the local backend adapter (lib/backend/local.js).
+//
+// The workout reminder uses native local notifications scheduled per planned weekday —
+// no server involved, unlike Web Push in the self-hosted version.
 //
 // Like the demo build, MOBILE is replaced at build time, so all of this folds away in
 // web bundles; the Capacitor plugins are only ever imported behind it.
 import { t } from './i18n.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
-
-const FILE = 'opengym-state.json'
-
-export async function nativeLoad() {
-  try {
-    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
-    const r = await Filesystem.readFile({ path: FILE, directory: Directory.Data, encoding: Encoding.UTF8 })
-    return JSON.parse(r.data)
-  } catch (e) { return null }   // first launch, or unreadable — localStorage copy takes over
-}
-
-export async function nativeSave(state) {
-  try {
-    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
-    await Filesystem.writeFile({ path: FILE, directory: Directory.Data, data: JSON.stringify(state), encoding: Encoding.UTF8 })
-  } catch (e) { /* keep the localStorage copy */ }
-}
 
 // (Re)schedule the workout-day reminder: one repeating notification per weekday that has a
 // routine in the weekly plan. Cheap enough to run after any state change — the plan or the
