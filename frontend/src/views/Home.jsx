@@ -48,7 +48,10 @@ export default function Home() {
   return <div className="narrow">
     <div className="hdr">
       <div><h1>{user ? t('Hi {0}', user.name) : 'openGym'}</h1><div className="sub">{today.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}</div></div>
-      <button className="iconbtn" onClick={() => nav('/settings')} aria-label={t('Settings')}><Icon name="gear" /></button>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {user && <SyncHeaderBtn />}
+        <button className="iconbtn" onClick={() => nav('/settings')} aria-label={t('Settings')}><Icon name="gear" /></button>
+      </div>
     </div>
 
     <div className="card">
@@ -129,4 +132,39 @@ export default function Home() {
       </div>
     </div>
   </div>
+}
+
+function SyncHeaderBtn() {
+  const isSyncing = useStore(s => s.isSyncing)
+  const pendingCount = useStore(s => s.pendingCount) || 0
+  const failedWorkouts = useStore(s => s.failedWorkouts) || {}
+  const { syncNow } = useStore()
+
+  const hasFailed = Object.keys(failedWorkouts).length > 0
+  const badgeColor = hasFailed ? 'var(--red)' : pendingCount > 0 ? 'var(--orange)' : null
+
+  return (
+    <button
+      className="iconbtn"
+      style={{ position: 'relative' }}
+      onClick={() => syncNow()}
+      aria-label={t('Sync')}
+      title={isSyncing ? t('Syncing...') : pendingCount > 0 ? t('{0} pending', pendingCount) : t('Cloud Sync')}
+    >
+      <Icon name="refresh" className={isSyncing ? 'spin' : ''} />
+      {badgeColor && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 5,
+            right: 5,
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            backgroundColor: badgeColor,
+          }}
+        />
+      )}
+    </button>
+  )
 }

@@ -74,6 +74,7 @@ export default function Settings() {
           onClick={() => window.open(REPO, '_blank', 'noopener')} />
       </> : user ? <>
         <Row icon="personCircle" iconTint="var(--grey)" title={user.name} subtitle={user.email ? user.email : t('Signed in — data syncs to this account.')} />
+        <SyncRow />
         <Row icon="signOut" iconTint="var(--red)" title={t('Sign out')} danger onClick={() => confirmSheet({ title: t('Sign out?'), message: t('Your data is synced to your account first, then cleared from this device.'), confirmText: t('Sign out'), danger: true, onConfirm: () => { signOut(); nav('/home') } })} />
         <Row icon="shield" iconTint="var(--red)" title={t('Sign out everywhere')} subtitle={t('Ends this account’s sessions on all your devices.')} danger onClick={signOutEverywhere} />
       </> : (
@@ -233,3 +234,52 @@ function MediaCacheCard({ S, update, toast }) {
     </Section>
   )
 }
+
+function SyncRow() {
+  const isSyncing = useStore(s => s.isSyncing)
+  const pendingCount = useStore(s => s.pendingCount) || 0
+  const failedWorkouts = useStore(s => s.failedWorkouts) || {}
+  const { syncNow } = useStore()
+  const toast = useUI(s => s.toast)
+
+  const failedEntries = Object.entries(failedWorkouts)
+  const failedCount = failedEntries.length
+
+  const handleSync = async () => {
+    if (isSyncing) return
+    toast(t('Syncing...'))
+    const res = await syncNow()
+    if (res?.ok) {
+      toast(t('Sync completed'))
+    } else {
+      toast(t('Sync failed — offline or network error'))
+    }
+  }
+
+  let subtitle = t('Up to date with cloud')
+  let iconTint = 'var(--acc)'
+
+  if (isSyncing) {
+    subtitle = t('Syncing...')
+    iconTint = 'var(--blue)'
+  } else if (failedCount > 0) {
+    const firstErr = failedEntries[0][1]?.msg || 'Error'
+    subtitle = t('{0} failed to sync ({1})', failedCount, firstErr)
+    iconTint = 'var(--red)'
+  } else if (pendingCount > 0) {
+    subtitle = t('{0} pending workout(s) to upload', pendingCount)
+    iconTint = 'var(--orange)'
+  }
+
+  return (
+    <Row
+      icon="refresh"
+      iconTint={iconTint}
+      title={t('Cloud Sync')}
+      subtitle={subtitle}
+      accessory="chevron"
+      onClick={handleSync}
+    />
+  )
+}
+

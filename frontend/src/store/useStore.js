@@ -4,6 +4,8 @@ import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { MOBILE, syncReminder } from '../lib/mobile.js'
+import { syncQueue } from './sync.js'
+import { onReconnect } from '../lib/net.js'
 
 const KEY = 'gym_state_v1'
 export const DEF = {
@@ -11,7 +13,8 @@ export const DEF = {
   theme: 'dark', accent: 'lime', body: 'male', targetW: null,
   bodyweight: [], routines: [], week: {}, dayPlan: {},
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
-  reminder: { on: false, time: '08:00', tz: null }, effort: null
+  reminder: { on: false, time: '08:00', tz: null }, effort: null,
+  wifiOnlyMedia: true,
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
@@ -28,7 +31,7 @@ const hasData = st => !!((st.workouts || []).length || (st.routines || []).lengt
 export const useStore = create((set, get) => {
   let pushTm = null
   let saveTm = null
-  const syncedWorkoutIds = new Set()
+  let reconnectUnsub = null
 
   // Mobile build: mirror the state into a file in the app's data directory (survives WebView
   // storage eviction) and keep the native reminder schedule in step with the weekly plan.
@@ -41,7 +44,11 @@ export const useStore = create((set, get) => {
     S._ts = S._ts || Date.now()
     registerCustom(S.customEx)
     localStorage.setItem(KEY, JSON.stringify(S))
-    set({ S })
+    set({
+      S,
+      pendingCount: syncQueue.getPendingCount(S.workouts),
+      failedWorkouts: syncQueue.getFailedWorkouts(),
+    })
     if (MOBILE) nativePersist()
     if (push && get().user) {
       clearTimeout(pushTm)
@@ -68,18 +75,26 @@ export const useStore = create((set, get) => {
 
   // Everything a sign-out leaves behind on this device, whichever way it was triggered.
   const clearLocalSession = () => {
-    syncedWorkoutIds.clear()
+    if (reconnectUnsub) {
+      reconnectUnsub()
+      reconnectUnsub = null
+    }
+    syncQueue.clearSyncState()
     get().setUser(null)
     localStorage.removeItem('gym_guest')
-    localStorage.removeItem('gym_dirty')
     localStorage.removeItem(KEY)
     persist(clone(DEF), false)
   }
 
+  const initialS = (() => { const s = loadState(); registerCustom(s.customEx); return s })()
+
   return {
-    S: (() => { const s = loadState(); registerCustom(s.customEx); return s })(),
+    S: initialS,
     user: (() => { try { return JSON.parse(localStorage.getItem('gym_user')) || null } catch { return null } })(),
     ready: false,
+    isSyncing: false,
+    pendingCount: syncQueue.getPendingCount(initialS.workouts),
+    failedWorkouts: syncQueue.getFailedWorkouts(),
 
     // Mutate a draft of S via producer fn, then persist + schedule sync.
     update(mut, push = true) {
@@ -106,11 +121,11 @@ export const useStore = create((set, get) => {
       clearTimeout(pushTm)
       const user = get().user
       const S = get().S
-      if (!user) return
+      if (!user?.id) return
 
       try {
         if (stateRepo.supportsPerSessionRows) {
-          // active is device-local and must never leak into settings/remote profile
+          // 1. Profile: active is device-local and must never leak into remote profile
           const { routines, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S
           const profile = {
             ts: _ts || Date.now(),
@@ -122,23 +137,26 @@ export const useStore = create((set, get) => {
             customEx: customEx || [],
             bodyweight: bodyweight || [],
           }
-          await stateRepo.saveProfile(user.id, profile)
-
-          // Only upload new / unsynced workouts instead of rewriting entire history
-          if (Array.isArray(workouts)) {
-            for (const w of workouts) {
-              if (w?.id && !syncedWorkoutIds.has(String(w.id))) {
-                await stateRepo.saveWorkout(user.id, w)
-                syncedWorkoutIds.add(String(w.id))
-              }
-            }
+          try {
+            await stateRepo.saveProfile(user.id, profile)
+            syncQueue.setProfileDirty(false)
+          } catch (profErr) {
+            syncQueue.setProfileDirty(true)
           }
+
+          // 2. Workouts: drain pending sessions sequentially via syncQueue
+          await syncQueue.drain(user.id, S.workouts, stateRepo)
         } else {
           await stateRepo.save(S)
+          syncQueue.setProfileDirty(false)
         }
-        localStorage.removeItem('gym_dirty')
       } catch (e) {
-        localStorage.setItem('gym_dirty', '1')
+        syncQueue.setProfileDirty(true)
+      } finally {
+        set({
+          pendingCount: syncQueue.getPendingCount(get().S.workouts),
+          failedWorkouts: syncQueue.getFailedWorkouts(),
+        })
       }
     },
 
@@ -153,11 +171,11 @@ export const useStore = create((set, get) => {
             stateRepo.listWorkouts(user.id),
           ])
 
-          const dirty = localStorage.getItem('gym_dirty') === '1'
+          const isDirty = syncQueue.isProfileDirty()
           const next = clone(S)
 
           // 1. Profile: timestamp check governs profile fields only
-          if (remoteProf && (!hasData(S) || ((remoteProf.ts || 0) >= (S._ts || 0) && !dirty))) {
+          if (remoteProf && (!hasData(S) || ((remoteProf.ts || 0) >= (S._ts || 0) && !isDirty))) {
             next._ts = remoteProf.ts
             Object.assign(next, remoteProf.settings || {})
             next.routines = remoteProf.routines || []
@@ -166,41 +184,38 @@ export const useStore = create((set, get) => {
             next.exWeights = remoteProf.exWeights || {}
             next.customEx = remoteProf.customEx || []
             next.bodyweight = remoteProf.bodyweight || []
+            syncQueue.setProfileDirty(false)
           } else if (hasData(S)) {
-            // Local profile is newer/dirty: push local profile to remote
+            // Local profile is newer or dirty: push to remote
             const { routines, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S
-            await stateRepo.saveProfile(user.id, {
-              ts: _ts || Date.now(),
-              settings,
-              routines: routines || [],
-              week: week || {},
-              dayPlan: dayPlan || {},
-              exWeights: exWeights || {},
-              customEx: customEx || [],
-              bodyweight: bodyweight || [],
-            })
-          }
-
-          // 2. Workouts: merge union by ID (completed sessions are immutable)
-          const localWorkouts = S.workouts || []
-          const localMap = new Map(localWorkouts.map(w => [String(w.id), w]))
-          const remoteMap = new Map((remoteWorkouts || []).map(w => [String(w.id), w]))
-
-          // Incoming remote workouts not present locally
-          for (const rw of remoteWorkouts || []) {
-            syncedWorkoutIds.add(String(rw.id))
-            if (!localMap.has(String(rw.id))) {
-              localMap.set(String(rw.id), rw)
+            try {
+              await stateRepo.saveProfile(user.id, {
+                ts: _ts || Date.now(),
+                settings,
+                routines: routines || [],
+                week: week || {},
+                dayPlan: dayPlan || {},
+                exWeights: exWeights || {},
+                customEx: customEx || [],
+                bodyweight: bodyweight || [],
+              })
+              syncQueue.setProfileDirty(false)
+            } catch (profErr) {
+              syncQueue.setProfileDirty(true)
             }
           }
 
-          // Upload any local workouts not yet saved in remote
-          for (const lw of localWorkouts) {
-            if (lw?.id && !remoteMap.has(String(lw.id))) {
-              await stateRepo.saveWorkout(user.id, lw).catch(() => {})
-              syncedWorkoutIds.add(String(lw.id))
-            } else if (lw?.id) {
-              syncedWorkoutIds.add(String(lw.id))
+          // 2. Workouts: merge union by ID and record confirmed IDs
+          const localWorkouts = S.workouts || []
+          const localMap = new Map(localWorkouts.map(w => [String(w.id), w]))
+          const remoteList = remoteWorkouts || []
+
+          // Confirm all remote IDs in syncQueue
+          syncQueue.markWorkoutsSynced(remoteList.map(rw => String(rw.id)))
+
+          for (const rw of remoteList) {
+            if (!localMap.has(String(rw.id))) {
+              localMap.set(String(rw.id), rw)
             }
           }
 
@@ -211,26 +226,56 @@ export const useStore = create((set, get) => {
           })
 
           next.workouts = mergedWorkouts
-          // Ensure active is never overwritten by remote state
           next.active = S.active || null
 
           persist(next, false)
-          localStorage.removeItem('gym_dirty')
+
+          // Drain any remaining local workouts to remote
+          await syncQueue.drain(user.id, next.workouts, stateRepo)
         } else {
           // Facade fallback for local adapter / demo
           const state = await stateRepo.load()
-          const dirty = localStorage.getItem('gym_dirty') === '1'
-          if (state && (!hasData(S) || ((state._ts || 0) >= (S._ts || 0) && !dirty))) {
+          const isDirty = syncQueue.isProfileDirty()
+          if (state && (!hasData(S) || ((state._ts || 0) >= (S._ts || 0) && !isDirty))) {
             const active = S.active
             const next = Object.assign(clone(DEF), state)
             if (active) next.active = active
             persist(next, false)
+            syncQueue.setProfileDirty(false)
           } else if (hasData(S) && user) {
             await get().pushState()
           }
         }
       } catch (e) {
         // Offline — keep local state intact
+      } finally {
+        set({
+          pendingCount: syncQueue.getPendingCount(get().S.workouts),
+          failedWorkouts: syncQueue.getFailedWorkouts(),
+        })
+      }
+    },
+
+    // Single unified refresh action: drains pending, retries failed items, and pulls remote state
+    async syncNow() {
+      const user = get().user
+      if (!user?.id) return { ok: true, skipped: true }
+
+      set({ isSyncing: true })
+      try {
+        // 1. Drain pending workouts including retrying any failed workouts
+        await syncQueue.drain(user.id, get().S.workouts, stateRepo, { includeFailed: true })
+        // 2. Pull remote updates
+        await get().pullState()
+        return { ok: true }
+      } catch (e) {
+        return { ok: false, error: e }
+      } finally {
+        set({
+          isSyncing: false,
+          pendingCount: syncQueue.getPendingCount(get().S.workouts),
+          failedWorkouts: syncQueue.getFailedWorkouts(),
+        })
       }
     },
 
@@ -247,7 +292,7 @@ export const useStore = create((set, get) => {
 
     async resetDemo() {
       const { buildDemoState } = await import('../lib/demoSeed.js')
-      localStorage.removeItem('gym_dirty')
+      syncQueue.clearSyncState()
       persist(Object.assign(clone(DEF), buildDemoState()), false)
     },
 
@@ -255,6 +300,15 @@ export const useStore = create((set, get) => {
       if (DEMO && !localStorage.getItem(DEMO_SEEDED)) {
         localStorage.setItem(DEMO_SEEDED, '1')
         await get().resetDemo()
+      }
+
+      // Reconnection handler: triggers background sync when device reconnects
+      if (!reconnectUnsub) {
+        reconnectUnsub = onReconnect(async () => {
+          if (get().user?.id && !get().isSyncing) {
+            await get().syncNow().catch(() => {})
+          }
+        })
       }
 
       try {
