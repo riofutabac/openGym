@@ -4,11 +4,12 @@ import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { bindUI } from './components/ui.jsx'
 import { ACCENTS } from './lib/format.js'
-import { setLang, useLang } from './lib/i18n.js'
+import { setLang, useLang, t } from './lib/i18n.js'
 import { setNav } from './lib/nav.js'
 import { useWakeLock } from './lib/wakelock.js'
 import { startFlow } from './sheets.jsx'
 import Icon from './components/Icon.jsx'
+import { auth } from './lib/backend/index.js'
 import TabBar from './components/TabBar.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Modals from './components/Modals.jsx'
@@ -49,6 +50,30 @@ function Shell() {
   useEffect(() => { window.scrollTo(0, 0) }, [loc.pathname])
   // bound to the workout, not to the route — checking Stats mid-session keeps the screen on
   useWakeLock(!!S.active && S.keepAwake !== false)
+
+  // Listen for native deep link callbacks (e.g. OAuth returning from system browser)
+  useEffect(() => {
+    let listener = null
+    const bindDeepLinks = async () => {
+      if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
+        try {
+          const { App: CapApp } = await import('@capacitor/app')
+          listener = await CapApp.addListener('appUrlOpen', async (event) => {
+            if (event?.url) {
+              const u = await auth.handleOAuthCallback?.(event.url)
+              if (u) {
+                useStore.getState().setUser(u)
+                await useStore.getState().pullState()
+                useUI.getState().toast(t('Welcome, {0}', u.name))
+              }
+            }
+          })
+        } catch { /* ignore */ }
+      }
+    }
+    bindDeepLinks()
+    return () => { listener?.remove?.() }
+  }, [])
 
   const authed = user || isGuest
   if (!ready && !authed) return (

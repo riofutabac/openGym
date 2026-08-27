@@ -155,6 +155,21 @@ docker compose up -d --build
 The app shell is versioned (`?v=N`) so clients pick up changes on next load. Your `./data` and the
 downloaded media are untouched.
 
+## 8. Using Appwrite Backend (Cloud or Self-Hosted)
+
+openGym supports connecting directly to Appwrite (Cloud or self-hosted) for authentication and cloud sync:
+
+1. **Create an Appwrite project** in the Appwrite Console (e.g. at [cloud.appwrite.io](https://cloud.appwrite.io)).
+2. **Configure Auth & Security**:
+   - Enable **Email/Password** authentication and/or **OAuth** providers (e.g. Google).
+   - Under **Auth → Security**, set **Session Length** to `31536000` (1 year).
+   - **Disable** the options for *Limit concurrent sessions* and *Session invalidation*.
+3. **Register Platforms**:
+   - Add a **Web App** platform with your web domain or `localhost`.
+   - Add an **Android App** platform with package name `ch.duartesantos.opengym`.
+4. **Configure Frontend**:
+   Set `VITE_APPWRITE=1`, `VITE_APPWRITE_ENDPOINT`, and `VITE_APPWRITE_PROJECT_ID` in `frontend/.env`.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -167,3 +182,5 @@ downloaded media are untouched.
 | Day reminder fires at the wrong time | Toggle it off and on in Settings so it re-detects your browser's timezone (also happens automatically on every app load — see section 6). |
 | Want to reset a stuck login | Delete the cookie in your browser; sessions are just signed cookies. |
 | `docker compose pull` fails with "denied" / "unauthorized" | The prebuilt images aren't published yet, or need to be, or the GHCR package is still private — build from source instead (`docker compose up -d --build`). |
+| Appwrite session closes unexpectedly | Ensure concurrent session limits and session invalidation are disabled in Appwrite Console (section 8). |
+
