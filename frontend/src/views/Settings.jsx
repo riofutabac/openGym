@@ -7,7 +7,7 @@ import { effortOf } from '../lib/history.js'
 import { wakeLockSupported } from '../lib/wakelock.js'
 import { t, LANGS, INSTR_LANGS } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
-import { MOBILE, shareExport, syncReminder } from '../lib/mobile.js'
+import { MOBILE, shareExport, syncReminder, checkExactNotificationSetting } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
 import { media } from '../lib/backend/index.js'
 import Icon from '../components/Icon.jsx'
@@ -177,19 +177,31 @@ export default function Settings() {
 }
 
 function MobileReminderCard({ S, update, toast }) {
+  const [exactSetting, setExactSetting] = useState(null)
   const setReminder = patch => update(s => { s.reminder = { ...(s.reminder || DEF.reminder), ...patch, tz: localTZ() } })
+
+  useEffect(() => {
+    checkExactNotificationSetting().then(setExactSetting).catch(() => {})
+  }, [])
+
   const toggle = async () => {
     const on = !S.reminder?.on
     if (on) {
       const ok = await syncReminder({ ...S, reminder: { ...(S.reminder || DEF.reminder), on: true } }, true)
       if (!ok) { toast(t('Could not change notification settings')); return }
+      checkExactNotificationSetting().then(setExactSetting).catch(() => {})
     }
     setReminder({ on })
   }
+
+  const alarmSubtitle = exactSetting?.exact === false
+    ? t('Standard alarms (may be slightly delayed by system battery saver)')
+    : t('Exact alarms active — rings on time with screen locked')
+
   return (
     <Section title={t('Notifications')}
-      footer={S.reminder?.on ? t('Reminds you at this time on days that have a routine planned.') : null}>
-      <Row icon="calendar" iconTint="var(--orange)" title={t('Workout day reminder')}>
+      footer={t('Rest timer and workout reminders run natively via OS alarms without requiring an active internet connection.')}>
+      <Row icon="calendar" iconTint="var(--orange)" title={t('Workout day reminder')} subtitle={S.reminder?.on ? t('Reminds at scheduled time on workout days') : null}>
         <Switch checked={!!S.reminder?.on} onChange={toggle} />
       </Row>
       {S.reminder?.on && (
@@ -198,6 +210,7 @@ function MobileReminderCard({ S, update, toast }) {
             onChange={e => setReminder({ time: e.target.value })} />
         </Row>
       )}
+      <Row icon="timer" iconTint="var(--pink)" title={t('Rest timer alarm')} subtitle={alarmSubtitle} />
     </Section>
   )
 }

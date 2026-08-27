@@ -57,3 +57,12 @@ Persistencia granular con **Document Security** habilitado (`Permission.read/upd
   - Errores `401`: abortan el drenado sin marcar fallos para proteger las credenciales.
   - Errores de cliente `4xx`: se ponen en cuarentena en `gym_sync_failed_v1` con su mensaje de error para no bloquear el resto de la cola, y se reintentan en el refresh manual.
   - Errores de red / `5xx`: se reintentan automáticamente al reconectar vía `onReconnect()`.
+
+## 5. Notificaciones y alarmas nativas (`mobile.js`)
+
+- **Temporizador de descanso sin servidor ni Web Push**:
+  - Las alarmas de fin de descanso se programan como notificaciones locales nativas (`@capacitor/local-notifications`) en el sistema operativo a la hora exacta de finalización (`endsAt`) con `allowWhileIdle: true`.
+  - Cuando Android congela el WebView de la app al bloquear la pantalla o cambiar de aplicación, el sistema operativo dispara la alarma con precisión al segundo.
+  - Cancelación estricta: `stopRest()` y `addRest()` cancelan incondicionalmente el ID reservado (`200`) para evitar notificaciones fantasma.
+  - Recordatorio de entreno: programado localmente para los días activos de la semana (`100 + día`) sin requerir backend.
+

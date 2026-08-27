@@ -3,9 +3,18 @@ import { uid } from '../lib/format.js'
 import { beep, vibrate } from '../lib/sound.js'
 import { t } from '../lib/i18n.js'
 import { useStore } from './useStore.js'
+import { scheduleRestNotification, cancelRestNotification, MOBILE } from '../lib/mobile.js'
 
-const pushRestTimer = () => {}
-const cancelPushRestTimer = () => {}
+const pushRestTimer = (sec) => {
+  if (MOBILE) {
+    scheduleRestNotification(sec).catch(() => {})
+  }
+}
+const cancelPushRestTimer = () => {
+  if (MOBILE) {
+    cancelRestNotification().catch(() => {})
+  }
+}
 
 let toastTm = null
 let timerInt = null
@@ -47,6 +56,7 @@ export const useUI = create((set, get) => ({
       if (left === tm.left) return
       const snd = useStore.getState().S.sound
       if (left <= 0) {
+        cancelPushRestTimer()
         beep(snd, 880, 0.15); beep(snd, 880, 0.15, 0.25); beep(snd, 1320, 0.4, 0.5)
         vibrate([200, 100, 200]); get().toast(t('Rest over — next set!')); get().stopRest(); return
       }
@@ -54,7 +64,7 @@ export const useUI = create((set, get) => ({
       set({ timer: { ...tm, left } })
     }
     timerInt = setInterval(timerTick, 1000)
-    document.addEventListener('visibilitychange', timerTick)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', timerTick)
   },
   addRest(sec) {
     const tm = get().timer
@@ -68,8 +78,8 @@ export const useUI = create((set, get) => ({
   },
   stopRest() {
     if (timerInt) clearInterval(timerInt); timerInt = null
-    if (timerTick) document.removeEventListener('visibilitychange', timerTick); timerTick = null
-    if (get().timer) cancelPushRestTimer()
+    if (timerTick && typeof document !== 'undefined') document.removeEventListener('visibilitychange', timerTick); timerTick = null
+    cancelPushRestTimer()
     set({ timer: null })
   },
 
@@ -106,7 +116,7 @@ export const useUI = create((set, get) => ({
       set({ work: { ...wk, left } })
     }
     workInt = setInterval(workTick, 1000)
-    document.addEventListener('visibilitychange', workTick)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', workTick)
   },
   // Ended the hold early — log what was actually held.
   finishWorkEarly() {
@@ -121,7 +131,7 @@ export const useUI = create((set, get) => ({
   // Abandon without logging anything.
   stopWork() {
     if (workInt) clearInterval(workInt); workInt = null
-    if (workTick) document.removeEventListener('visibilitychange', workTick); workTick = null
+    if (workTick && typeof document !== 'undefined') document.removeEventListener('visibilitychange', workTick); workTick = null
     workDone = null
     set({ work: null })
   }

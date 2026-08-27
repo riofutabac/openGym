@@ -5,8 +5,8 @@
 // on WebView localStorage alone (iOS evicts that under storage pressure). State persistence
 // is handled by the local backend adapter (lib/backend/local.js).
 //
-// The workout reminder uses native local notifications scheduled per planned weekday —
-// no server involved, unlike Web Push in the self-hosted version.
+// The workout reminder and rest timer alarms use native local notifications scheduled
+// on the operating system — no server involved, and works even when the WebView is frozen.
 //
 // Like the demo build, MOBILE is replaced at build time, so all of this folds away in
 // web bundles; the Capacitor plugins are only ever imported behind it.
@@ -14,13 +14,21 @@ import { t } from './i18n.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
 
+export const REST_NOTIFICATION_ID = 200
+
+async function getLocalNotifications(options = {}) {
+  if (options.plugin) return options.plugin
+  const { LocalNotifications } = await import('@capacitor/local-notifications')
+  return LocalNotifications
+}
+
 // (Re)schedule the workout-day reminder: one repeating notification per weekday that has a
 // routine in the weekly plan. Cheap enough to run after any state change — the plan or the
 // reminder time may just have been edited. `interactive` gates the OS permission prompt to
 // the Settings toggle; a background resync never pops a dialog.
-export async function syncReminder(S, interactive = false) {
+export async function syncReminder(S, interactive = false, options = {}) {
   try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    const LocalNotifications = await getLocalNotifications(options)
     await LocalNotifications.cancel({ notifications: [0, 1, 2, 3, 4, 5, 6].map(d => ({ id: 100 + d })) }).catch(() => {})
     const r = S.reminder
     if (!r?.on) return true
@@ -40,6 +48,58 @@ export async function syncReminder(S, interactive = false) {
     if (notifications.length) await LocalNotifications.schedule({ notifications })
     return true
   } catch (e) { return false }
+}
+
+// Schedule an OS-level rest timer alarm at endsAt so that the user is notified
+// even if Android suspends the WebView when the screen is locked.
+export async function scheduleRestNotification(sec, options = {}) {
+  if (!sec || sec <= 0) return false
+  try {
+    const LocalNotifications = await getLocalNotifications(options)
+    await LocalNotifications.cancel({ notifications: [{ id: REST_NOTIFICATION_ID }] }).catch(() => {})
+
+    const perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted') return false
+
+    const at = new Date(Date.now() + Math.round(sec) * 1000)
+    await LocalNotifications.schedule({
+      notifications: [{
+        id: REST_NOTIFICATION_ID,
+        title: 'openGym',
+        body: t('Rest over — next set!'),
+        schedule: { at, allowWhileIdle: true },
+      }]
+    })
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+// Unconditionally cancel any scheduled rest timer alarm
+export async function cancelRestNotification(options = {}) {
+  try {
+    const LocalNotifications = await getLocalNotifications(options)
+    await LocalNotifications.cancel({ notifications: [{ id: REST_NOTIFICATION_ID }] }).catch(() => {})
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+// Check exact alarm / notification permission on native platforms
+export async function checkExactNotificationSetting(options = {}) {
+  try {
+    const LocalNotifications = await getLocalNotifications(options)
+    const perm = await LocalNotifications.checkPermissions()
+    if (typeof LocalNotifications.checkExactNotificationSetting === 'function') {
+      const exact = await LocalNotifications.checkExactNotificationSetting()
+      return { display: perm.display, exact: exact.exact_alarm === 'granted' }
+    }
+    return { display: perm.display, exact: true }
+  } catch (e) {
+    return { display: 'unknown', exact: false }
+  }
 }
 
 // WKWebView can't do blob-URL downloads, so the backup goes out through the OS share sheet

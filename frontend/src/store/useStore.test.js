@@ -65,6 +65,8 @@ describe('useStore boot() and lifecycle', () => {
     it('boot() authenticates user when session exists', async () => {
       vi.spyOn(auth, 'currentUser').mockResolvedValue({ id: 'usr_real', name: 'Real User', email: 'real@example.com' })
       vi.spyOn(stateRepo, 'load').mockResolvedValue(null)
+      vi.spyOn(stateRepo, 'loadProfile').mockResolvedValue(null)
+      vi.spyOn(stateRepo, 'listWorkouts').mockResolvedValue([])
 
       await useStore.getState().boot()
 
