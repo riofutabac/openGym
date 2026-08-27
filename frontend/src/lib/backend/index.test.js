@@ -8,7 +8,9 @@ describe('Backend Factory', () => {
     expect(backend.state).toBeDefined()
     expect(backend.auth).toBeDefined()
     expect(backend.auth.supportsEmailPassword).toBe(true)
-    expect(backend.auth.supportsOAuth).toBe(true)
+    // OAuth stays hidden until a provider is configured — an unconfigured
+    // provider means a button that fails when pressed
+    expect(backend.auth.supportsOAuth).toBe(false)
     expect(backend.media).toBeDefined()
     await expect(backend.api('/test')).rejects.toThrow()
   })
@@ -17,8 +19,14 @@ describe('Backend Factory', () => {
     const backend = getBackend({ VITE_APPWRITE: '1' })
     expect(backend).toBeDefined()
     expect(backend.auth.supportsEmailPassword).toBe(true)
-    expect(backend.auth.supportsOAuth).toBe(true)
+    expect(backend.auth.supportsOAuth).toBe(false)
     expect(backend.state).toBeDefined()
+  })
+
+  it('advertises OAuth once a provider is configured', async () => {
+    const backend = getBackend({ VITE_APPWRITE: '1', VITE_APPWRITE_OAUTH_PROVIDER: 'google' })
+    expect(backend.auth.supportsOAuth).toBe(true)
+    expect(backend.auth.oauthProviderName).toBe('Google')
   })
 
   it('returns local adapter when VITE_DEMO=1', async () => {

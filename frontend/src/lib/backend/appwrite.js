@@ -24,6 +24,14 @@ export function createAppwriteAdapter(options = {}) {
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APPWRITE_PROJECT_ID) ||
     ''
 
+  // OAuth is advertised only when a provider is actually configured. An always-on
+  // button for a provider with no client credentials in the Appwrite console is a
+  // button that fails; setting VITE_APPWRITE_OAUTH_PROVIDER brings it back.
+  const oauthProvider =
+    options.oauthProvider ||
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APPWRITE_OAUTH_PROVIDER) ||
+    ''
+
   const fallbackLocal = createLocalAdapter()
   const stateRepo = options.state || fallbackLocal.state
   const mediaProvider = options.media || fallbackLocal.media
@@ -76,7 +84,10 @@ export function createAppwriteAdapter(options = {}) {
 
     auth: {
       supportsEmailPassword: true,
-      supportsOAuth: true,
+      supportsOAuth: !!oauthProvider,
+      oauthProviderName: oauthProvider
+        ? oauthProvider.charAt(0).toUpperCase() + oauthProvider.slice(1)
+        : '',
 
       async currentUser() {
         try {
@@ -128,8 +139,12 @@ export function createAppwriteAdapter(options = {}) {
         }
       },
 
-      async loginWithOAuth(provider) {
+      async loginWithOAuth(providerArg) {
         try {
+          const provider = providerArg || oauthProvider
+          if (!provider) {
+            throw new Error('No OAuth provider configured (set VITE_APPWRITE_OAUTH_PROVIDER)')
+          }
           const isCapacitor = typeof window !== 'undefined' && !!window.Capacitor?.isNativePlatform?.()
           const origin = (typeof window !== 'undefined' && window.location?.origin) || 'https://localhost'
 

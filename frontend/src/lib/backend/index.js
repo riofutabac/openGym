@@ -27,6 +27,7 @@ export function getBackend(env = (typeof import.meta !== 'undefined' ? import.me
     const appwrite = createAppwriteAdapter({
       endpoint: env?.VITE_APPWRITE_ENDPOINT,
       projectId: env?.VITE_APPWRITE_PROJECT_ID,
+      oauthProvider: env?.VITE_APPWRITE_OAUTH_PROVIDER,
       state: local.state,
       media: local.media,
     })

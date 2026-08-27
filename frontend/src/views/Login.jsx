@@ -94,7 +94,7 @@ function AppwriteAuth() {
 
   const handleOAuth = async () => {
     try {
-      await auth.loginWithOAuth('google')
+      await auth.loginWithOAuth()
     } catch (err) {
       useUI.getState().toast(err.message || t('OAuth failed'))
     }
@@ -127,7 +127,7 @@ function AppwriteAuth() {
         <>
           <div className="dim small" style={{ textAlign: 'center', margin: '4px 0' }}>{t('or')}</div>
           <Button variant="outline" onClick={handleOAuth} disabled={busy}>
-            {t('Continue with Google')}
+            {t('Continue with {0}', auth.oauthProviderName || 'Google')}
           </Button>
         </>
       )}
