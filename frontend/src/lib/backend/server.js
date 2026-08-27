@@ -1,5 +1,9 @@
 // Server backend adapter for openGym.
 //
+// TODO (Milestone 3): The passkey session cookie emitted by api/server.js authorizes PUT /api/data.
+// Once state persistence moves to Appwrite Databases in Milestone 3, this entire adapter and
+// its custom passkeys will be decommissioned.
+//
 // Encapsulates the custom Node.js backend (REST endpoints + WebAuthn passkeys).
 // Network calls go through api() which attaches the JSON content-type and preserves
 // the HTTP status code on errors (e.status), allowing callers to handle 401 or offline
