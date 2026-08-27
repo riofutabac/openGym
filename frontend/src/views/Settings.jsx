@@ -7,7 +7,7 @@ import { effortOf } from '../lib/history.js'
 import { wakeLockSupported } from '../lib/wakelock.js'
 import { t, LANGS, INSTR_LANGS } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
-import { MOBILE, shareExport, syncReminder, checkExactNotificationSetting } from '../lib/mobile.js'
+import { MOBILE, shareExport, syncReminder, checkExactNotificationSetting, requestNotificationPermissions } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
 import { media } from '../lib/backend/index.js'
 import Icon from '../components/Icon.jsx'
@@ -184,6 +184,16 @@ function MobileReminderCard({ S, update, toast }) {
     checkExactNotificationSetting().then(setExactSetting).catch(() => {})
   }, [])
 
+  const handleEnablePermissions = async () => {
+    const granted = await requestNotificationPermissions()
+    if (granted) {
+      toast(t('Notification permissions enabled'))
+    } else {
+      toast(t('Permission not granted'))
+    }
+    checkExactNotificationSetting().then(setExactSetting).catch(() => {})
+  }
+
   const toggle = async () => {
     const on = !S.reminder?.on
     if (on) {
@@ -194,13 +204,18 @@ function MobileReminderCard({ S, update, toast }) {
     setReminder({ on })
   }
 
-  const alarmSubtitle = exactSetting?.exact === false
+  const alarmSubtitle = exactSetting?.display !== 'granted'
+    ? t('Notifications disabled — tap to grant permission')
+    : exactSetting?.exact === false
     ? t('Standard alarms (may be slightly delayed by system battery saver)')
     : t('Exact alarms active — rings on time with screen locked')
 
   return (
     <Section title={t('Notifications')}
       footer={t('Rest timer and workout reminders run natively via OS alarms without requiring an active internet connection.')}>
+      {exactSetting?.display !== 'granted' && (
+        <Row icon="bell" iconTint="var(--red)" title={t('Enable notifications')} subtitle={t('Required for rest timer alarms when screen is locked')} accessory="chevron" onClick={handleEnablePermissions} />
+      )}
       <Row icon="calendar" iconTint="var(--orange)" title={t('Workout day reminder')} subtitle={S.reminder?.on ? t('Reminds at scheduled time on workout days') : null}>
         <Switch checked={!!S.reminder?.on} onChange={toggle} />
       </Row>
@@ -210,7 +225,7 @@ function MobileReminderCard({ S, update, toast }) {
             onChange={e => setReminder({ time: e.target.value })} />
         </Row>
       )}
-      <Row icon="timer" iconTint="var(--pink)" title={t('Rest timer alarm')} subtitle={alarmSubtitle} />
+      <Row icon="timer" iconTint={exactSetting?.display === 'granted' ? 'var(--pink)' : 'var(--red)'} title={t('Rest timer alarm')} subtitle={alarmSubtitle} onClick={exactSetting?.display !== 'granted' ? handleEnablePermissions : undefined} />
     </Section>
   )
 }

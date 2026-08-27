@@ -3,7 +3,7 @@ import { auth, state as stateRepo } from '../lib/backend/index.js'
 import { localTZ } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
-import { MOBILE, syncReminder } from '../lib/mobile.js'
+import { MOBILE, syncReminder, updateOngoingWorkoutNotification, clearOngoingWorkoutNotification } from '../lib/mobile.js'
 import { syncQueue } from './sync.js'
 import { onReconnect } from '../lib/net.js'
 
@@ -325,6 +325,12 @@ export const useStore = create((set, get) => {
 
         if (MOBILE) {
           syncReminder(get().S)
+          const active = get().S.active
+          if (active) {
+            updateOngoingWorkoutNotification({ name: active.name }).catch(() => {})
+          } else {
+            clearOngoingWorkoutNotification().catch(() => {})
+          }
         }
 
         const tz = localTZ()

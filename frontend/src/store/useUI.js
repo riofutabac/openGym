@@ -3,17 +3,28 @@ import { uid } from '../lib/format.js'
 import { beep, vibrate } from '../lib/sound.js'
 import { t } from '../lib/i18n.js'
 import { useStore } from './useStore.js'
-import { scheduleRestNotification, cancelRestNotification, MOBILE } from '../lib/mobile.js'
+import { scheduleRestNotification, cancelRestNotification, updateOngoingWorkoutNotification, clearOngoingWorkoutNotification, onNotificationAction, MOBILE } from '../lib/mobile.js'
+
+const activeName = () => useStore.getState().S?.active?.name
 
 const pushRestTimer = (sec) => {
-  if (MOBILE) {
-    scheduleRestNotification(sec).catch(() => {})
-  }
+  if (!MOBILE) return
+  const name = activeName()
+  scheduleRestNotification(sec, { workoutName: name }).catch(() => {})
+  // The card carries the moment rest ends, not a countdown — see mobile.js for why.
+  updateOngoingWorkoutNotification({ name, restEndsAt: Date.now() + sec * 1000 }).catch(() => {})
 }
-const cancelPushRestTimer = () => {
-  if (MOBILE) {
-    cancelRestNotification().catch(() => {})
-  }
+
+// `repost` is false while a rest is being replaced by another one: startRest calls stopRest
+// first, and rewriting the card back to "workout in progress" only to overwrite it a tick
+// later makes the shade flicker for no reason.
+const cancelPushRestTimer = (repost = true) => {
+  if (!MOBILE) return
+  cancelRestNotification().catch(() => {})
+  if (!repost) return
+  const name = activeName()
+  if (name) updateOngoingWorkoutNotification({ name }).catch(() => {})
+  else clearOngoingWorkoutNotification().catch(() => {})
 }
 
 let toastTm = null
@@ -45,7 +56,7 @@ export const useUI = create((set, get) => ({
   },
 
   startRest(sec) {
-    get().stopRest()
+    get().stopRest({ repost: false })
     const endsAt = Date.now() + sec * 1000
     set({ timer: { left: sec, total: sec, endsAt } })
     pushRestTimer(sec)
@@ -76,10 +87,10 @@ export const useUI = create((set, get) => ({
     set({ timer: { ...tm, left, total: tm.total + sec, endsAt: tm.endsAt + sec * 1000 } })
     pushRestTimer(left)
   },
-  stopRest() {
+  stopRest(opts = {}) {
     if (timerInt) clearInterval(timerInt); timerInt = null
     if (timerTick && typeof document !== 'undefined') document.removeEventListener('visibilitychange', timerTick); timerTick = null
-    cancelPushRestTimer()
+    cancelPushRestTimer(opts.repost !== false)
     set({ timer: null })
   },
 
@@ -136,3 +147,16 @@ export const useUI = create((set, get) => ({
     set({ work: null })
   }
 }))
+
+// Lock-screen buttons on the rest alarm. Registered once, native build only.
+//
+// The handler re-reads live state instead of closing over the rest it was scheduled with:
+// the tap can arrive long after, and if the app was killed in between there is no timer left
+// to extend — addRest already no-ops in that case, which is the honest outcome rather than
+// resurrecting a rest the user has long since finished.
+if (MOBILE) {
+  onNotificationAction(({ actionId }) => {
+    if (actionId === 'rest-add') useUI.getState().addRest(15)
+    else if (actionId === 'rest-skip') useUI.getState().stopRest()
+  })
+}
