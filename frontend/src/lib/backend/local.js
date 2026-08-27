@@ -171,11 +171,21 @@ export function createLocalAdapter(options = {}) {
     },
 
     media: {
-      imageUrl(id) {
-        return `${IMG_BASE}${id}.jpg`
+      imageUrl(idOrEx) {
+        if (!idOrEx) return ''
+        if (typeof idOrEx === 'object') {
+          if (idOrEx.img) return `${IMG_BASE}${idOrEx.img}`
+          if (idOrEx.id) return `${IMG_BASE}${idOrEx.id}.jpg`
+        }
+        return `${IMG_BASE}${idOrEx}.jpg`
       },
-      gifUrl(id) {
-        return `${GIF_BASE}${id}.gif`
+      gifUrl(idOrEx) {
+        if (!idOrEx) return ''
+        if (typeof idOrEx === 'object') {
+          if (idOrEx.gif) return `${GIF_BASE}${idOrEx.gif}`
+          if (idOrEx.id) return `${GIF_BASE}${idOrEx.id}.gif`
+        }
+        return `${GIF_BASE}${idOrEx}.gif`
       },
     },
   }

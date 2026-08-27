@@ -116,46 +116,27 @@ mobile app is the install-and-done flavor.
   download. Self-host and add it to your home screen from Safari (it's a full PWA), or build
   the native app onto your own device from Xcode — see **[docs/MOBILE.md](docs/MOBILE.md)**.
 
-## How it works
+## How it's built
 
-```
-┌─────────────┐        ┌──────────────────────────────┐
-│  Your phone │──HTTPS─▶│  web  (nginx)                │
-│  / laptop   │        │   ├─ serves the built app    │
-└─────────────┘        │   └─ proxies /api ──────────┐│
-                       └──────────────────────────────┘│
-                                                        ▼
-                                        ┌──────────────────────────┐
-                                        │  api  (Node + WebAuthn)  │
-                                        │   └─ ./data (JSON files) │
-                                        └──────────────────────────┘
-```
-
-- **frontend/** — React + Vite (React Router + Zustand), built to static files **inside Docker**
-- **api/** — Node with no framework, one dependency (`@simplewebauthn/server`), storing everything as plain JSON files under `./data`
-- **web/** — a multi-stage image that builds the frontend and serves it with nginx, proxying `/api` to the backend so it's all on **one origin** (passkeys require this)
+- **frontend/** — React + Vite (React Router + Zustand), with domain-isolated backend adapters under `lib/backend/`.
+- **Appwrite Backend** — Appwrite Cloud / Self-hosted instance with TablesDB collections (`profiles`, `workouts`) and row-level document security.
+- **Mobile (Android)** — Capacitor native build communicating with Appwrite and persisting native caches.
 
 ## Your data
 
-Lives in `./data` on your host: `db.json` (profiles + public passkeys), `state-<user>.json`
-(each user's plan, workouts, body weight, settings), and `secret` (the session-cookie key).
-**Back up `./data` and you've backed up everything.** Passkey private keys never touch the
-server — they stay in your phone's secure hardware / your password manager.
+Workouts and profiles are stored in **Appwrite Databases / TablesDB** under `profiles` (settings, routines, plan, weigh-ins) and `workouts` (one immutable row per workout session). Row-level document security (`Permission.read/update/delete(Role.user(uid))`) guarantees that each user's data is strictly isolated.
 
 ## Configuration
 
-All via `.env` (see `.env.example`):
+All configured via `frontend/.env` (see `frontend/.env.example`):
 
-| Variable      | What it is                                           | Default                 |
-|---------------|------------------------------------------------------|-------------------------|
-| `RP_ID`       | Hostname passkeys are bound to                       | `localhost`             |
-| `ORIGIN`      | Full URL the app is served from                      | `http://localhost:8080` |
-| `WEB_PORT`    | Host port for the web UI                             | `8080`                  |
-| `RP_NAME`     | Name shown in the passkey prompt                     | `openGym`               |
-| `ADMIN_UIDS`  | User ids that get the admin dashboard (comma-separated) | *(none)*             |
-| `INVITE_ONLY` | Require an invite code to create a profile           | *(off)*                 |
-
-Push notification keys are generated on first run and saved to `./data/vapid.json` — nothing to set.
+| Variable | What it is | Example |
+|---|---|---|
+| `VITE_APPWRITE` | Enables Appwrite backend | `1` |
+| `VITE_APPWRITE_ENDPOINT` | Regional Appwrite Cloud endpoint | `https://sfo.cloud.appwrite.io/v1` |
+| `VITE_APPWRITE_PROJECT_ID` | Your Appwrite project ID | `6a904b0d003e4351232f` |
+| `VITE_APPWRITE_DATABASE_ID` | Appwrite database ID | `opengym` |
+| `VITE_APPWRITE_OAUTH_PROVIDER` | Optional OAuth provider | `google` |
 
 ## Roadmap
 

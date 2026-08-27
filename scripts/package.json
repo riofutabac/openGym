@@ -1,0 +1,9 @@
+{
+  "name": "opengym-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "node-appwrite": "^14.2.0"
+  }
+}

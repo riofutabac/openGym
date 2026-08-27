@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createAppwriteAdapter } from './appwrite.js'
-import { runContractTests } from './contract.test.js'
+import { runContractTests } from './contract.js'
+import { createMockDatabases } from './testUtils.js'
 
 // Mock Account service for Appwrite
 function createMockAccount() {
@@ -79,9 +80,11 @@ function createMockAccount() {
 
 describe('Appwrite Adapter', () => {
   let mockAccount
+  let mockDatabases
 
   beforeEach(() => {
     mockAccount = createMockAccount()
+    mockDatabases = createMockDatabases()
   })
 
   // 1. Run standard conformance contract suite
@@ -89,15 +92,21 @@ describe('Appwrite Adapter', () => {
     'Appwrite Adapter (Mocked SDK)',
     () => {
       mockAccount = createMockAccount()
+      mockDatabases = createMockDatabases()
       mockAccount._setSession({ $id: 'usr_contract', name: 'Contract User', email: 'test@example.com' })
       return createAppwriteAdapter({
         account: mockAccount,
+        databases: mockDatabases,
         projectId: 'test_project',
+        endpoint: 'https://sfo.cloud.appwrite.io/v1',
+        network: { getStatus: async () => ({ connected: true, connectionType: 'wifi' }) },
+        fetch: async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }),
         ID: { unique: () => 'uid_' + Math.random().toString(36).slice(2) },
       })
     },
     () => {
       mockAccount?._reset()
+      mockDatabases?._reset()
     }
   )
 

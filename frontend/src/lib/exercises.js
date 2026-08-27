@@ -26,13 +26,10 @@ export function registerCustom(list) {
 // Full searchable catalogue — customs first so your own exercises are easy to find.
 export const allExercises = st => [...(st.customEx || []), ...EXDB]
 
-// Media normally sits next to the app (img/ and gif/, mounted into the web container).
-// A build can point them somewhere else — the demo build pulls them off a CDN instead of
-// shipping ~140 MB of images into the deployment.
-const IMG_BASE = import.meta.env.VITE_IMG_BASE || 'img/'
-const GIF_BASE = import.meta.env.VITE_GIF_BASE || 'gif/'
-export const imgSrc = ex => IMG_BASE + ex.img
-export const gifSrc = ex => GIF_BASE + ex.gif
+import { media } from './backend/index.js'
+
+export const imgSrc = ex => (typeof ex === 'string' ? media.imageUrl(ex) : (ex?.img ? media.imageUrl(ex) : ''))
+export const gifSrc = ex => (typeof ex === 'string' ? media.gifUrl(ex) : (ex?.gif ? media.gifUrl(ex) : ''))
 
 // Cardio exercises log time + speed instead of weight × reps.
 export const isCardio = idOrEx => (typeof idOrEx === 'string' ? EXIDX[idOrEx] : idOrEx)?.bp === 'cardio'

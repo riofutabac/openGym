@@ -11,10 +11,6 @@ export const DEF = {
   theme: 'dark', accent: 'lime', body: 'male', targetW: null,
   bodyweight: [], routines: [], week: {}, dayPlan: {},
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
-  // effort: which per-set effort scale is logged — 'none' | 'rir' | 'rpe'. null, not 'none', so
-  // that a profile which never chose (loaded state is overlaid on DEF, on every path: local,
-  // server pull, backup import) still falls back to the `showRir` boolean this replaced and
-  // keeps the column it had. See effortOf.
   reminder: { on: false, time: '08:00', tz: null }, effort: null
 }
 const clone = o => JSON.parse(JSON.stringify(o))
@@ -32,6 +28,7 @@ const hasData = st => !!((st.workouts || []).length || (st.routines || []).lengt
 export const useStore = create((set, get) => {
   let pushTm = null
   let saveTm = null
+  const syncedWorkoutIds = new Set()
 
   // Mobile build: mirror the state into a file in the app's data directory (survives WebView
   // storage eviction) and keep the native reminder schedule in step with the weekly plan.
@@ -41,7 +38,7 @@ export const useStore = create((set, get) => {
   }
 
   const persist = (S, push = true) => {
-    S._ts = Date.now()
+    S._ts = S._ts || Date.now()
     registerCustom(S.customEx)
     localStorage.setItem(KEY, JSON.stringify(S))
     set({ S })
@@ -53,9 +50,6 @@ export const useStore = create((set, get) => {
   }
 
   // A setting changed right before switching away/closing the tab must not get lost mid-debounce
-  // (e.g. setting the reminder time then immediately backgrounding to test it). On mobile the
-  // same applies to the file mirror — backgrounding is often the last thing before the OS
-  // kills the app.
   if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'hidden') return
@@ -74,6 +68,7 @@ export const useStore = create((set, get) => {
 
   // Everything a sign-out leaves behind on this device, whichever way it was triggered.
   const clearLocalSession = () => {
+    syncedWorkoutIds.clear()
     get().setUser(null)
     localStorage.removeItem('gym_guest')
     localStorage.removeItem('gym_dirty')
@@ -89,10 +84,14 @@ export const useStore = create((set, get) => {
     // Mutate a draft of S via producer fn, then persist + schedule sync.
     update(mut, push = true) {
       const S = clone(get().S)
+      S._ts = Date.now()
       mut(S)
       persist(S, push)
     },
-    replaceState(S, push = false) { persist(clone(S), push) },
+    replaceState(S, push = false) {
+      S._ts = S._ts || Date.now()
+      persist(clone(S), push)
+    },
 
     isGuest: () => localStorage.getItem('gym_guest') === '1',
     setGuest(v) { if (v) localStorage.setItem('gym_guest', '1'); else localStorage.removeItem('gym_guest'); set({}) },
@@ -105,29 +104,134 @@ export const useStore = create((set, get) => {
 
     async pushState() {
       clearTimeout(pushTm)
+      const user = get().user
+      const S = get().S
+      if (!user) return
+
       try {
-        await stateRepo.save(get().S)
-        if (get().user) localStorage.removeItem('gym_dirty')
+        if (stateRepo.supportsPerSessionRows) {
+          // active is device-local and must never leak into settings/remote profile
+          const { routines, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S
+          const profile = {
+            ts: _ts || Date.now(),
+            settings,
+            routines: routines || [],
+            week: week || {},
+            dayPlan: dayPlan || {},
+            exWeights: exWeights || {},
+            customEx: customEx || [],
+            bodyweight: bodyweight || [],
+          }
+          await stateRepo.saveProfile(user.id, profile)
+
+          // Only upload new / unsynced workouts instead of rewriting entire history
+          if (Array.isArray(workouts)) {
+            for (const w of workouts) {
+              if (w?.id && !syncedWorkoutIds.has(String(w.id))) {
+                await stateRepo.saveWorkout(user.id, w)
+                syncedWorkoutIds.add(String(w.id))
+              }
+            }
+          }
+        } else {
+          await stateRepo.save(S)
+        }
+        localStorage.removeItem('gym_dirty')
       } catch (e) {
-        if (get().user) localStorage.setItem('gym_dirty', '1')
+        localStorage.setItem('gym_dirty', '1')
       }
     },
+
     async pullState() {
+      const user = get().user
+      const S = get().S
+
       try {
-        const state = await stateRepo.load()
-        const S = get().S
-        const dirty = localStorage.getItem('gym_dirty') === '1'
-        if (state && (!hasData(S) || ((state._ts || 0) >= (S._ts || 0) && !dirty))) {
-          const active = S.active
-          const next = Object.assign(clone(DEF), state)
-          if (active) next.active = active
+        if (stateRepo.supportsPerSessionRows && user?.id) {
+          const [remoteProf, remoteWorkouts] = await Promise.all([
+            stateRepo.loadProfile(user.id),
+            stateRepo.listWorkouts(user.id),
+          ])
+
+          const dirty = localStorage.getItem('gym_dirty') === '1'
+          const next = clone(S)
+
+          // 1. Profile: timestamp check governs profile fields only
+          if (remoteProf && (!hasData(S) || ((remoteProf.ts || 0) >= (S._ts || 0) && !dirty))) {
+            next._ts = remoteProf.ts
+            Object.assign(next, remoteProf.settings || {})
+            next.routines = remoteProf.routines || []
+            next.week = remoteProf.week || {}
+            next.dayPlan = remoteProf.dayPlan || {}
+            next.exWeights = remoteProf.exWeights || {}
+            next.customEx = remoteProf.customEx || []
+            next.bodyweight = remoteProf.bodyweight || []
+          } else if (hasData(S)) {
+            // Local profile is newer/dirty: push local profile to remote
+            const { routines, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S
+            await stateRepo.saveProfile(user.id, {
+              ts: _ts || Date.now(),
+              settings,
+              routines: routines || [],
+              week: week || {},
+              dayPlan: dayPlan || {},
+              exWeights: exWeights || {},
+              customEx: customEx || [],
+              bodyweight: bodyweight || [],
+            })
+          }
+
+          // 2. Workouts: merge union by ID (completed sessions are immutable)
+          const localWorkouts = S.workouts || []
+          const localMap = new Map(localWorkouts.map(w => [String(w.id), w]))
+          const remoteMap = new Map((remoteWorkouts || []).map(w => [String(w.id), w]))
+
+          // Incoming remote workouts not present locally
+          for (const rw of remoteWorkouts || []) {
+            syncedWorkoutIds.add(String(rw.id))
+            if (!localMap.has(String(rw.id))) {
+              localMap.set(String(rw.id), rw)
+            }
+          }
+
+          // Upload any local workouts not yet saved in remote
+          for (const lw of localWorkouts) {
+            if (lw?.id && !remoteMap.has(String(lw.id))) {
+              await stateRepo.saveWorkout(user.id, lw).catch(() => {})
+              syncedWorkoutIds.add(String(lw.id))
+            } else if (lw?.id) {
+              syncedWorkoutIds.add(String(lw.id))
+            }
+          }
+
+          const mergedWorkouts = Array.from(localMap.values())
+          mergedWorkouts.sort((a, b) => {
+            if (a.d !== b.d) return (a.d || '') > (b.d || '') ? 1 : -1
+            return (a.start || 0) - (b.start || 0)
+          })
+
+          next.workouts = mergedWorkouts
+          // Ensure active is never overwritten by remote state
+          next.active = S.active || null
+
           persist(next, false)
-        } else if (hasData(S)) {
-          // First run after an update from a file-less version, or local state newer:
-          // seed/update the backend storage mirror and track gym_dirty if offline.
-          await get().pushState()
+          localStorage.removeItem('gym_dirty')
+        } else {
+          // Facade fallback for local adapter / demo
+          const state = await stateRepo.load()
+          const dirty = localStorage.getItem('gym_dirty') === '1'
+          if (state && (!hasData(S) || ((state._ts || 0) >= (S._ts || 0) && !dirty))) {
+            const active = S.active
+            const next = Object.assign(clone(DEF), state)
+            if (active) next.active = active
+            persist(next, false)
+          } else if (hasData(S) && user) {
+            await get().pushState()
+          }
         }
-      } catch (e) { /* offline — keep local */ }
+      } catch (e) {
+        // Offline — keep local state intact
+      }
     },
 
     async signOut() {
@@ -135,26 +239,18 @@ export const useStore = create((set, get) => {
       clearLocalSession()
     },
 
-    // "Sign out everywhere": the server bumps this profile's session version, which kills every
-    // session it has on any device — this browser included, so the app has to end up exactly
-    // where a normal signOut leaves it. Unlike signOut the request is NOT swallowed: if it fails
-    // the sessions elsewhere are all still valid, and wiping this device's copy of the data
-    // would sign the user out of the one place the bump didn't reach. Caller reports the error.
     async signOutAll() {
-      await get().pushState()   // never throws — stores gym_dirty and moves on when offline
+      await get().pushState()
       await auth.logoutEverywhere()
       clearLocalSession()
     },
 
-    // Demo build only: drop the seeded example profile back in (Settings → "Reset demo data").
-    // Dynamic import so the generator never ships in a self-hosted bundle.
     async resetDemo() {
       const { buildDemoState } = await import('../lib/demoSeed.js')
       localStorage.removeItem('gym_dirty')
       persist(Object.assign(clone(DEF), buildDemoState()), false)
     },
 
-    // Boot: ask the adapter who we are, then pull.
     async boot() {
       if (DEMO && !localStorage.getItem(DEMO_SEEDED)) {
         localStorage.setItem(DEMO_SEEDED, '1')
@@ -177,8 +273,6 @@ export const useStore = create((set, get) => {
           syncReminder(get().S)
         }
 
-        // Re-stamp the reminder's timezone on every load — keeps it correct if you're travelling,
-        // without needing to revisit Settings.
         const tz = localTZ()
         if (get().S.reminder?.on && get().S.reminder.tz !== tz) {
           get().update(s => { s.reminder = { ...s.reminder, tz } })

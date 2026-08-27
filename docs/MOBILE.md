@@ -8,13 +8,11 @@ openGym ships in two flavors from the same codebase:
 | Accounts | passkey sign-in, one profile per person | none — the phone *is* the account |
 | Data | synced to your server, readable on desktop | stays on the device (file in the app's private storage) |
 | Reminders | Web Push from your server | native local notifications, no server involved |
-| Exercise media | served by your server (`img/`, `gif/`) | loaded from the jsDelivr CDN |
+| Exercise media | served by Appwrite Storage | 1324 JPGs (11 MB) bundled in APK; GIFs cached over Wi-Fi (max 50 MB) |
 
-The mobile flavor never talks to a backend: no sign-in screen, no sync, no telemetry.
-State is mirrored from `localStorage` into `opengym-state.json` in the app's private data
-directory on every change (iOS is allowed to evict WebView storage under pressure — the
-file mirror is the durable copy and is restored on launch). Backups go out through the
-OS share sheet instead of a browser download.
+The mobile flavor talks directly to Appwrite with durable accounts and offline caching.
+All 1324 exercise JPG images travel directly inside the APK for instant offline rendering,
+while animated GIFs are cached dynamically with an LRU budget and Wi-Fi downloading rules.
 
 ## Prerequisites
 

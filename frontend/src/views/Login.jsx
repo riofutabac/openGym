@@ -1,48 +1,11 @@
 import { useStore, hasData } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { auth } from '../lib/backend/index.js'
-import { webauthnOK, api, BIO } from '../lib/api.js'
 import { t } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
-
-// Passkey registration sheet for self-hosted Node server build
-function PasskeyRegisterSheet({ close }) {
-  const { setUser, pushState, pullState } = useStore()
-  const [name, setName] = useState('')
-  const [code, setCode] = useState('')
-  const [inviteOnly, setInviteOnly] = useState(false)
-  const ref = useRef(null)
-  useEffect(() => { setTimeout(() => ref.current?.focus(), 250) }, [])
-  // TODO (Milestone 7): retire /api/config once instance settings move to Appwrite
-  useEffect(() => { api('/api/config').then(c => setInviteOnly(!!c.invite_only)).catch(() => {}) }, [])
-  const go = async () => {
-    const n = name.trim()
-    if (!n) { useUI.getState().toast(t('Enter a name')); return }
-    if (inviteOnly && !code.trim()) { useUI.getState().toast(t('An invite code is required')); return }
-    try {
-      const u = await auth.register(n, code.trim())
-      setUser(u); close()
-      if (hasData(useStore.getState().S)) { await pushState(); useUI.getState().toast(t('Profile created — data from this device moved into it')) }
-      else { await pullState(); useUI.getState().toast(t('Welcome, {0}', u.name)) }
-    } catch (e) { if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') useUI.getState().toast(e.message || t('Registration failed')) }
-  }
-  return <>
-    <h3>{t('Create your profile')}</h3>
-    <div className="muted small" style={{ marginBottom: 14 }}>{t('Pick a name, then confirm with {0}. The passkey is saved in your device — no password needed.', BIO)}</div>
-    <input ref={ref} className="input" placeholder={t('Your name')} maxLength={40} value={name} onChange={e => setName(e.target.value)} />
-    {inviteOnly && <>
-      <div style={{ height: 10 }} />
-      <input className="input" placeholder={t('Invite code')} maxLength={40} value={code}
-        onChange={e => setCode(e.target.value.toUpperCase())} style={{ letterSpacing: '.14em', fontWeight: 600, textAlign: 'center' }} />
-      <div className="dim small" style={{ marginTop: 6 }}>{t('This app is invite-only — enter the code you were given.')}</div>
-    </>}
-    <div style={{ height: 12 }} />
-    <Button variant="primary" onClick={go}>{t('Create passkey')}</Button>
-  </>
-}
 
 // Appwrite email/password + OAuth authentication view
 function AppwriteAuth() {
@@ -94,11 +57,15 @@ function AppwriteAuth() {
 
   const handleOAuth = async () => {
     try {
-      await auth.loginWithOAuth()
+      await auth.loginWithOAuth(auth.oauthProviderName?.toLowerCase() || 'google')
     } catch (err) {
       useUI.getState().toast(err.message || t('OAuth failed'))
     }
   }
+
+  const oauthLabel = auth.oauthProviderName
+    ? t('Continue with {0}', auth.oauthProviderName)
+    : t('Continue with Google')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
@@ -127,7 +94,7 @@ function AppwriteAuth() {
         <>
           <div className="dim small" style={{ textAlign: 'center', margin: '4px 0' }}>{t('or')}</div>
           <Button variant="outline" onClick={handleOAuth} disabled={busy}>
-            {t('Continue with {0}', auth.oauthProviderName || 'Google')}
+            {oauthLabel}
           </Button>
         </>
       )}
@@ -151,11 +118,7 @@ function AppwriteAuth() {
 }
 
 export default function Login() {
-  const { setUser, pullState, setGuest } = useStore()
-  const signInPasskey = async () => {
-    try { const u = await auth.login(); setUser(u); await pullState(); useUI.getState().toast(t('Welcome back, {0}', u.name)) }
-    catch (e) { if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') useUI.getState().toast(e.message || t('Sign-in failed')) }
-  }
+  const { setGuest } = useStore()
   const head = <>
     <div style={{ fontSize: 54, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="dumbbell" /></div>
     <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-.028em', margin: '10px 0 4px' }}>openGym</h1>
@@ -177,29 +140,11 @@ export default function Login() {
     </div>
   )
 
-  // Appwrite authentication mode (mobile APK / Appwrite web)
-  if (auth.supportsEmailPassword) {
-    return (
-      <div className="narrow" style={wrap}>
-        {head}
-        <div className="muted" style={{ marginBottom: 24 }}>{t('Your workouts. Your weights. Your account.')}</div>
-        <AppwriteAuth />
-      </div>
-    )
-  }
-
-  // Self-hosted passkey authentication mode
   return (
     <div className="narrow" style={wrap}>
       {head}
-      <div className="muted" style={{ marginBottom: 34 }}>{t('Your workouts. Your weights. Your profile.')}</div>
-      {webauthnOK() ? <>
-        <Button variant="primary" icon="person" onClick={signInPasskey}>{t('Sign in with passkey')}</Button>
-        <div style={{ height: 10 }} />
-        <Button icon="sparkles" onClick={() => useUI.getState().openSheet(close => <PasskeyRegisterSheet close={close} />)}>{t('Create new profile')}</Button>
-        <div style={{ height: 10 }} />
-      </> : <div className="card small muted" style={{ textAlign: 'left' }}>{t("This browser doesn't support passkeys — you can still use openGym locally on this device.")}</div>}
-      <div className="dim small" style={{ marginTop: 26, lineHeight: 1.5 }}>{t('Passkeys use {0} — no passwords.', BIO)}<br />{t('Each profile keeps its own plan, workouts & body weight.')}</div>
+      <div className="muted" style={{ marginBottom: 24 }}>{t('Your workouts. Your weights. Your account.')}</div>
+      <AppwriteAuth />
     </div>
   )
 }

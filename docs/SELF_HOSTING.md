@@ -1,186 +1,144 @@
-# Self-hosting openGym
+# Self-hosting openGym with Appwrite
 
-openGym is two small containers (a web server and an API) plus a folder of your data.
-This guide takes you from "just cloned it" to "using it from my phone over the internet".
+openGym operates with **Appwrite Cloud** or a self-hosted Appwrite instance. The app uses Appwrite for authentication, user profiles, and granular per-session workout logs with row-level document security.
 
-## 1. Run it locally (5 minutes)
+---
 
-Requirements: [Docker](https://docs.docker.com/get-docker/) with the Compose plugin.
+## 1. Appwrite Console Setup
 
-```bash
-git clone https://github.com/DuarteSantos8/gym-app opengym
-cd opengym
-cp .env.example .env
-docker compose pull   # prebuilt images from ghcr.io (amd64 + arm64) — or skip and build from source
-docker compose up -d
-```
+In your Appwrite Cloud project (or self-hosted Appwrite):
 
-- First start downloads the exercise images/GIFs (~140 MB) once into `app/img` and `app/gif`.
-- Open **http://localhost:8080** and create a profile with a passkey.
-- Rather build from source than pull prebuilt images? Skip `docker compose pull` and run
-  `docker compose up -d --build` instead — no Node needed locally either way.
+### A. Database & Tables
 
-Check it's healthy:
+Column types below are the ones the app is actually deployed with — they are not
+interchangeable with the obvious alternatives:
 
-```bash
-docker compose ps
-curl http://localhost:8080/api/health      # {"ok":true,...}
-```
+- `ts`, `start` and `end` hold `Date.now()` values (~1.8e12), which **overflow a 32-bit
+  integer**. They must be `bigint`.
+- The JSON columns are `text` / `mediumtext`, not `string(N)`. A table's in-row size is
+  capped at 65535 bytes, and a handful of large `string` columns exceeds it; `text` types
+  are stored off-row (the deployed `profiles` table uses 1472 of 65535 bytes).
+- Table-level `create("users")` is **required**. Row security governs read/update/delete of
+  each row, but creating a row still needs table-level create permission — with empty table
+  permissions no user can ever write anything.
 
-Logs: `docker compose logs -f`. Stop: `docker compose down`.
+1. Create a database with ID `opengym` (or choose your own and set `VITE_APPWRITE_DATABASE_ID`).
 
-## 2. Understand the passkey requirement (important)
+2. Create table **`profiles`** — row ID is the Appwrite user ID:
 
-openGym signs you in with **passkeys** (WebAuthn). Browsers enforce two rules:
+   | Column | Type | Required |
+   |---|---|---|
+   | `userId` | string(64) | yes |
+   | `ts` | bigint | no |
+   | `settings` | text | no |
+   | `routines` | mediumtext | no |
+   | `week` | text | no |
+   | `dayPlan` | mediumtext | no |
+   | `exWeights` | mediumtext | no |
+   | `customEx` | mediumtext | no |
+   | `bodyweight` | mediumtext | no |
 
-1. Passkeys are bound to an exact **hostname** (`RP_ID`).
-2. They only work over **HTTPS** — with one exception: `http://localhost`.
+   - **Row security**: enabled.
+   - **Table permissions**: `create("users")` only.
 
-So `http://localhost:8080` works on the machine running Docker, but **another device (your
-phone) cannot use `http://<your-LAN-ip>:8080`** — that's neither localhost nor HTTPS, so the
-passkey prompt won't appear. To use openGym from your phone you need a real HTTPS hostname.
+3. Create table **`workouts`** — one row per training session, row ID is the client-generated
+   session id:
 
-(You can still open it over LAN in **guest mode**, which stores data only in that browser.)
+   | Column | Type | Required |
+   |---|---|---|
+   | `userId` | string(64) | yes |
+   | `d` | string(10) | yes |
+   | `start` | bigint | no |
+   | `end` | bigint | no |
+   | `routineId` | string(64) | no |
+   | `name` | string(200) | no |
+   | `bw` | double | no |
+   | `vol` | double | no |
+   | `prs` | text | no |
+   | `entries` | mediumtext | no |
 
-## 3. Expose it over HTTPS on your own domain
+   - Indexes: `userId_idx` (key, `userId` ASC) and `userId_d_idx` (key, `userId` ASC + `d` ASC).
+   - **Row security**: enabled.
+   - **Table permissions**: `create("users")` only.
 
-Put openGym behind something that terminates TLS for a hostname you control, then point it at
-the `web` container. Pick whichever you already run:
+Each row is written with `read`/`update`/`delete` permissions for its owner alone, so on a
+shared instance one account cannot read another's rows. Verify this with a second account
+before trusting it: reading another user's row must answer **401**, not an empty list.
 
-### Option A — Cloudflare Tunnel (no open ports)
+### B. Authentication
+- Under **Auth -> Settings**, ensure **Email/Password** is enabled.
+- Set Session Lifetime to 1 year (`31536000` seconds).
+- Configure OAuth providers (e.g. Google) if desired.
 
-1. Create a tunnel and route `gym.example.com` → `http://<docker-host>:8080`.
-2. Cloudflare gives you HTTPS automatically.
+---
 
-### Option B — Caddy (automatic Let's Encrypt)
+## 2. Frontend Configuration
 
-```caddy
-gym.example.com {
-    reverse_proxy localhost:8080
-}
-```
-
-### Option C — Traefik / nginx / Nginx Proxy Manager
-
-Route `gym.example.com` (HTTPS) → `web:80` (or `<docker-host>:8080`). Any reverse proxy works —
-openGym only needs the browser to reach it over `https://gym.example.com`.
-
-Then set your domain in `.env` and restart:
-
-```bash
-# .env
-RP_ID=gym.example.com
-ORIGIN=https://gym.example.com
-WEB_PORT=8080
-RP_NAME=openGym
-```
-
-```bash
-docker compose up -d
-```
-
-Visit `https://gym.example.com`, create your profile, and add it to your home screen
-(iOS: Share → Add to Home Screen · Android: ⋮ → Add to Home screen).
-
-> Changing `RP_ID` later invalidates existing passkeys (they were bound to the old hostname).
-> Pick your domain before people register.
-
-## 4. Multiple users
-
-Anyone who can reach the URL can create their own profile — each gets isolated data. That's the
-default: open signup, no admin.
-
-If you'd rather control who gets in, two optional settings in `.env` turn that around:
+Create `frontend/.env`:
 
 ```bash
-ADMIN_UIDS=youruserid      # comma-separated; these users get the admin dashboard
-INVITE_ONLY=1              # new profiles need an invite code
+VITE_APPWRITE=1
+# Regional endpoint (e.g. sfo, fra, nyc):
+VITE_APPWRITE_ENDPOINT=https://sfo.cloud.appwrite.io/v1
+VITE_APPWRITE_PROJECT_ID=your_project_id
+VITE_APPWRITE_DATABASE_ID=opengym
+# Optional OAuth provider:
+# VITE_APPWRITE_OAUTH_PROVIDER=google
 ```
 
-Register your own passkey profile first, then find your id in `./data/db.json` under `users[].id`
-and put it in `ADMIN_UIDS`. You'll get an **Admin dashboard** link in Settings: who's training
-right now, each user's workout history and body weight, the ability to disable an account (signed
-out and locked out everywhere until you re-enable it), and — with `INVITE_ONLY=1` — generating and
-revoking invite codes. Existing accounts keep working when you switch invite-only on. Admin access
-is gated by your passkey and enforced server-side, so it needs no separate login.
-
-Prefer to keep the whole thing off the open internet? A VPN or an auth proxy (Authelia, Cloudflare
-Access…) in front still works, and composes with the above.
-
-## 5. Backups
-
-Everything is in `./data`:
+Build and run:
 
 ```bash
-tar czf opengym-backup-$(date +%F).tar.gz data/
+cd frontend
+npm install
+npm run build
 ```
 
-That archive contains all profiles, passkeys and workout history. Restore by unpacking it back
-into the project folder. (Individual users can also export their own data as JSON from Settings.)
+---
 
-## 6. Notifications
+## 3. Data Migration (from legacy db.json)
 
-openGym can push two kinds of alert to your phone/desktop, even when the app isn't open:
-rest-timer-over, and a reminder on days you have a workout planned but haven't logged one yet.
-Turn it on per-profile in **Settings → Notifications** (requires a signed-in passkey profile and
-HTTPS — see section 3).
-
-No setup needed server-side, and nothing to configure per timezone: VAPID keys are generated on
-first run and saved to `./data/vapid.json`, and each user's browser reports its own timezone
-automatically when they turn the reminder on — it fires at their local time, and follows them if
-they travel, regardless of what timezone the server itself runs in.
-
-**Keep screen awake** (Settings → *During a workout*) has the same transport requirement: the
-Wake Lock API is only available over HTTPS or on `http://localhost`, so on a plain-LAN-IP
-instance the switch shows as unsupported. Nothing to configure server-side either way, and iOS
-refuses the lock while the phone is in Low Power Mode.
-
-## 7. Updating
-
-Running prebuilt images:
+If you have existing workouts in `data/db.json` or `data/state-<uid>.json`:
 
 ```bash
-git pull                    # picks up compose/config changes
-docker compose pull
-docker compose up -d
+node scripts/migrate-to-appwrite.mjs \
+  --db data/db.json \
+  --user <source-user-id> \
+  --account <appwrite-user-id> \
+  --endpoint https://<region>.cloud.appwrite.io/v1 \
+  --project <project-id> \
+  --key <server-api-key-with-databases-scope>
 ```
 
-Building from source instead:
+The script migrates the profile and all workout rows, re-reads data from Appwrite, and verifies that workout and bodyweight counts match before reporting success.
+
+---
+
+## 4. Storage Bucket Setup & Media Upload
+
+Exercise animations (GIFs) are stored in Appwrite Storage, while static JPGs are bundled directly within the app.
+
+### A. Create Bucket
+In Appwrite Console:
+1. Go to **Storage -> Create Bucket**.
+2. **Bucket ID**: `exercises`
+3. **Permissions**: Add `read("any")` (public read access so animations can load without session cookies).
+4. **Max File Size**: 5 MB.
+5. **Compression & Encryption**: Disabled (dataset contains pre-compressed binary media).
+
+### B. Upload Media
+Download the dataset and upload the files to your bucket:
 
 ```bash
-git pull
-docker compose up -d --build
+# 1. Fetch media dataset locally if not already downloaded
+./scripts/fetch-media.sh
+
+# 2. Upload animations to Appwrite Storage bucket
+node scripts/upload-media-to-appwrite.mjs \
+  --endpoint https://<region>.cloud.appwrite.io/v1 \
+  --project <project-id> \
+  --key <server-api-key-with-files-write-scope> \
+  --bucket exercises \
+  --dir ./media/gif
 ```
-
-The app shell is versioned (`?v=N`) so clients pick up changes on next load. Your `./data` and the
-downloaded media are untouched.
-
-## 8. Using Appwrite Backend (Cloud or Self-Hosted)
-
-openGym supports connecting directly to Appwrite (Cloud or self-hosted) for authentication and cloud sync:
-
-1. **Create an Appwrite project** in the Appwrite Console (e.g. at [cloud.appwrite.io](https://cloud.appwrite.io)).
-2. **Configure Auth & Security**:
-   - Enable **Email/Password** authentication and/or **OAuth** providers (e.g. Google).
-   - Under **Auth → Security**, set **Session Length** to `31536000` (1 year).
-   - **Disable** the options for *Limit concurrent sessions* and *Session invalidation*.
-3. **Register Platforms**:
-   - Add a **Web App** platform with your web domain or `localhost`.
-   - Add an **Android App** platform with package name `ch.duartesantos.opengym`.
-4. **Configure Frontend**:
-   Set `VITE_APPWRITE=1`, `VITE_APPWRITE_ENDPOINT`, and `VITE_APPWRITE_PROJECT_ID` in `frontend/.env`.
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| No passkey prompt on my phone | You're on `http://` or an IP, not HTTPS. Set up a domain (section 3). |
-| "verification failed" on login | `RP_ID`/`ORIGIN` don't match the URL in the address bar. Make them exact, restart. |
-| Media didn't download | `docker compose logs media`. Re-run `docker compose up -d`, or run `./scripts/fetch-media.sh`. |
-| Port 8080 already used | Set `WEB_PORT=9090` in `.env` (and update `ORIGIN` for local testing). |
-| No "Notifications" option in Settings | Requires a signed-in profile and HTTPS (or `localhost`) — guest mode and plain HTTP over LAN can't subscribe. |
-| Day reminder fires at the wrong time | Toggle it off and on in Settings so it re-detects your browser's timezone (also happens automatically on every app load — see section 6). |
-| Want to reset a stuck login | Delete the cookie in your browser; sessions are just signed cookies. |
-| `docker compose pull` fails with "denied" / "unauthorized" | The prebuilt images aren't published yet, or need to be, or the GHCR package is still private — build from source instead (`docker compose up -d --build`). |
-| Appwrite session closes unexpectedly | Ensure concurrent session limits and session invalidation are disabled in Appwrite Console (section 8). |
 

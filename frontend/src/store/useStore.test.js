@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useStore, DEF, hasData } from './useStore.js'
 import { createLocalAdapter } from '../lib/backend/local.js'
-import { createServerAdapter } from '../lib/backend/server.js'
 import { auth, state as stateRepo } from '../lib/backend/index.js'
 
 // Polyfill localStorage in test environment
@@ -58,7 +57,6 @@ describe('useStore boot() and lifecycle', () => {
 
       await useStore.getState().boot()
 
-      // When no active Appwrite/server session, user remains unauthenticated
       expect(useStore.getState().user).toBeNull()
       expect(useStore.getState().isGuest()).toBe(false)
       expect(useStore.getState().ready).toBe(true)
@@ -84,57 +82,109 @@ describe('useStore boot() and lifecycle', () => {
       expect(useStore.getState().isGuest()).toBe(false)
       expect(useStore.getState().ready).toBe(true)
     })
+  })
 
-    it('seeds the backend storage mirror when local state has data but mirror was empty', async () => {
-      let savedState = null
-      const customAdapter = createLocalAdapter({
-        mockCapacitor: true,
-        readFile: async () => {
-          if (!savedState) throw new Error('File not found')
-          return { data: savedState }
-        },
-        writeFile: async ({ data }) => {
-          savedState = JSON.parse(data)
+  describe('Appwrite Per-Session Row Sync & Merging', () => {
+    it('merges remote workouts with local workouts by id without losing history', async () => {
+      useStore.setState({
+        user: { id: 'u_sync_test', name: 'Sync User' },
+        S: {
+          ...JSON.parse(JSON.stringify(DEF)),
+          _ts: 1000,
+          routines: [{ id: 'r1', name: 'Local Routine' }],
+          workouts: [
+            { id: 'w_local_1', d: '2026-03-01', start: 100, name: 'Local Only', entries: [] },
+            { id: 'w_shared_1', d: '2026-03-02', start: 200, name: 'Shared', entries: [] },
+          ],
         },
       })
 
-      // Simulate local state with workouts
-      const stateWithData = {
-        ...JSON.parse(JSON.stringify(DEF)),
-        _ts: 100,
-        workouts: [{ d: '2026-01-01', entries: [] }],
+      const mockDomainRepo = {
+        supportsPerSessionRows: true,
+        loadProfile: vi.fn().mockResolvedValue({
+          ts: 2000,
+          settings: { unit: 'lb' },
+          routines: [{ id: 'r2', name: 'Remote Routine' }],
+          week: {},
+          dayPlan: {},
+          exWeights: {},
+          customEx: [],
+          bodyweight: [],
+        }),
+        listWorkouts: vi.fn().mockResolvedValue([
+          { id: 'w_shared_1', d: '2026-03-02', start: 200, name: 'Shared', entries: [] },
+          { id: 'w_remote_2', d: '2026-03-03', start: 300, name: 'Remote Only', entries: [] },
+        ]),
+        saveWorkout: vi.fn().mockResolvedValue(undefined),
+        saveProfile: vi.fn().mockResolvedValue(undefined),
       }
-      useStore.setState({ S: stateWithData })
-      expect(hasData(stateWithData)).toBe(true)
 
-      // Initial state load from mirror is null
-      const initial = await customAdapter.state.load()
-      expect(initial).toBeNull()
+      Object.assign(stateRepo, mockDomainRepo)
 
-      // State save seeds the mirror
-      await customAdapter.state.save(stateWithData)
+      await useStore.getState().pullState()
 
-      // Storage mirror now reflects seeded state
-      const loaded = await customAdapter.state.load()
-      expect(loaded).toEqual(stateWithData)
+      const currentS = useStore.getState().S
+
+      expect(currentS.unit).toBe('lb')
+      expect(currentS.routines).toEqual([{ id: 'r2', name: 'Remote Routine' }])
+
+      expect(currentS.workouts.length).toBe(3)
+      const ids = currentS.workouts.map(w => w.id)
+      expect(ids).toContain('w_local_1')
+      expect(ids).toContain('w_shared_1')
+      expect(ids).toContain('w_remote_2')
+
+      expect(mockDomainRepo.saveWorkout).toHaveBeenCalledWith('u_sync_test', expect.objectContaining({ id: 'w_local_1' }))
     })
 
-    it('restores state from mirror when mirror has newer state', async () => {
-      const remoteState = {
-        ...JSON.parse(JSON.stringify(DEF)),
-        _ts: 500,
-        unit: 'lb',
-        workouts: [{ d: '2026-02-01', entries: [] }],
+    it('pushState uploads only unsynced workouts and never includes active workout in remote profile', async () => {
+      const saveWorkoutMock = vi.fn().mockResolvedValue(undefined)
+      const saveProfileMock = vi.fn().mockResolvedValue(undefined)
+
+      const mockDomainRepo = {
+        supportsPerSessionRows: true,
+        loadProfile: vi.fn().mockResolvedValue(null),
+        listWorkouts: vi.fn().mockResolvedValue([
+          { id: 'w_already_synced', d: '2026-03-01', start: 100, name: 'Old Session', entries: [] }
+        ]),
+        saveWorkout: saveWorkoutMock,
+        saveProfile: saveProfileMock,
       }
 
-      const customAdapter = createLocalAdapter({
-        mockCapacitor: true,
-        readFile: async () => ({ data: remoteState }),
-        writeFile: async () => {},
+      Object.assign(stateRepo, mockDomainRepo)
+
+      useStore.setState({
+        user: { id: 'u_push_test', name: 'Push Test' },
+        S: {
+          ...JSON.parse(JSON.stringify(DEF)),
+          active: { name: 'Active In Progress', start: Date.now(), entries: [] },
+          workouts: [
+            { id: 'w_already_synced', d: '2026-03-01', start: 100, name: 'Old Session', entries: [] }
+          ],
+        },
       })
 
-      const loaded = await customAdapter.state.load()
-      expect(loaded).toEqual(remoteState)
+      // Pull state to register existing synced workouts
+      await useStore.getState().pullState()
+      saveWorkoutMock.mockClear()
+      saveProfileMock.mockClear()
+
+      // Add a newly finished workout and trigger pushState
+      const newWorkout = { id: 'w_new_session', d: '2026-03-02', start: 200, name: 'New Session', entries: [] }
+      useStore.getState().update(s => {
+        s.workouts.push(newWorkout)
+      }, false)
+
+      await useStore.getState().pushState()
+
+      // 1. Only the new workout was saved — NOT the already synced one
+      expect(saveWorkoutMock).toHaveBeenCalledTimes(1)
+      expect(saveWorkoutMock).toHaveBeenCalledWith('u_push_test', expect.objectContaining({ id: 'w_new_session' }))
+
+      // 2. Profile was saved without active leaking into settings
+      expect(saveProfileMock).toHaveBeenCalledWith('u_push_test', expect.not.objectContaining({ active: expect.anything() }))
+      const profileArg = saveProfileMock.mock.calls[0][1]
+      expect(profileArg.settings.active).toBeUndefined()
     })
   })
 
@@ -145,16 +195,14 @@ describe('useStore boot() and lifecycle', () => {
         S: { ...JSON.parse(JSON.stringify(DEF)), _ts: 200, workouts: [{ d: '2026-01-01', entries: [] }] },
       })
 
-      // Server state is null or older
+      stateRepo.supportsPerSessionRows = false
       vi.spyOn(stateRepo, 'load').mockResolvedValue(null)
-      // Save fails (e.g. network offline)
       vi.spyOn(stateRepo, 'save').mockRejectedValue(new Error('Network error'))
 
       expect(globalThis.localStorage.getItem('gym_dirty')).toBeNull()
 
       await useStore.getState().pullState()
 
-      // gym_dirty is correctly set to '1' so offline changes are protected against newer remote state
       expect(globalThis.localStorage.getItem('gym_dirty')).toBe('1')
     })
 
@@ -165,6 +213,7 @@ describe('useStore boot() and lifecycle', () => {
         S: { ...JSON.parse(JSON.stringify(DEF)), _ts: 200, workouts: [{ d: '2026-01-01', entries: [] }] },
       })
 
+      stateRepo.supportsPerSessionRows = false
       vi.spyOn(stateRepo, 'save').mockResolvedValue(undefined)
 
       await useStore.getState().pushState()
@@ -179,23 +228,6 @@ describe('useStore boot() and lifecycle', () => {
       await expect(localAdapter.api('/api/test')).rejects.toThrow(
         'API network calls are disabled in local backend mode'
       )
-    })
-
-    it('server adapter api() calls fetch and preserves HTTP error status', async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: async () => ({ error: 'Unauthorized' }),
-      })
-
-      const serverAdapter = createServerAdapter({ fetchFn: mockFetch })
-      try {
-        await serverAdapter.api('/api/me')
-        expect.unreachable()
-      } catch (e) {
-        expect(e.status).toBe(401)
-        expect(e.message).toBe('Unauthorized')
-      }
     })
   })
 })

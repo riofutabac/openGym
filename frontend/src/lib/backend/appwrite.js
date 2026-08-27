@@ -8,6 +8,8 @@
 // migrate routines/workouts and asset files to Appwrite Databases and Storage.
 
 import { createLocalAdapter } from './local.js'
+import { createAppwriteStateRepo } from './appwriteData.js'
+import { createAppwriteMediaProvider } from './appwriteMedia.js'
 
 export function createAppwriteAdapter(options = {}) {
   // No default endpoint on purpose: Appwrite Cloud is regional, and the generic
@@ -66,19 +68,26 @@ export function createAppwriteAdapter(options = {}) {
   const isSessionGone = (err) => (err?.code || err?.status) === 401
 
   const fallbackLocal = createLocalAdapter()
-  const stateRepo = options.state || fallbackLocal.state
-  const mediaProvider = options.media || fallbackLocal.media
+  const mediaProvider = options.media || createAppwriteMediaProvider(options)
 
   let cachedAccount = options.account || null
+  let cachedClient = options.client || null
 
-  const getAccount = async () => {
-    if (cachedAccount) return cachedAccount
+  const getClient = async () => {
+    if (cachedClient) return cachedClient
     if (!options.client) {
       if (!projectId) throw new Error('VITE_APPWRITE_PROJECT_ID is required to initialize Appwrite')
       if (!endpoint) throw new Error('VITE_APPWRITE_ENDPOINT is required to initialize Appwrite (Cloud endpoints are regional, e.g. https://sfo.cloud.appwrite.io/v1)')
     }
-    const { Client, Account } = await import('appwrite')
-    const client = options.client || new Client().setEndpoint(endpoint).setProject(projectId)
+    const { Client } = await import('appwrite')
+    cachedClient = options.client || new Client().setEndpoint(endpoint).setProject(projectId)
+    return cachedClient
+  }
+
+  const getAccount = async () => {
+    if (cachedAccount) return cachedAccount
+    const client = await getClient()
+    const { Account } = await import('appwrite')
     cachedAccount = new Account(client)
     return cachedAccount
   }
@@ -107,17 +116,22 @@ export function createAppwriteAdapter(options = {}) {
     }
   }
 
-  return {
-    api: async () => {
-      throw new Error('Direct API calls are disabled in Appwrite backend mode')
-    },
+  let authInstance = null
 
-    state: stateRepo,
-    media: mediaProvider,
+  const stateRepo =
+    options.state ||
+    createAppwriteStateRepo({
+      databases: options.databases,
+      client: options.client,
+      databaseId: options.databaseId,
+      auth: {
+        currentUser: () => authInstance?.currentUser() || Promise.resolve(null),
+      },
+    })
 
-    auth: {
-      supportsEmailPassword: true,
-      supportsOAuth: !!oauthProvider,
+  authInstance = {
+    supportsEmailPassword: true,
+    supportsOAuth: !!oauthProvider,
       oauthProviderName: oauthProvider
         ? oauthProvider.charAt(0).toUpperCase() + oauthProvider.slice(1)
         : '',
@@ -283,8 +297,6 @@ export function createAppwriteAdapter(options = {}) {
         }
       },
 
-      // Ends all sessions across devices; errors are intentionally NOT swallowed so callers
-      // (useStore.signOutAll) do not clear local state if remote session invalidation failed.
       async logoutEverywhere() {
         try {
           const account = await getAccount()
@@ -294,6 +306,14 @@ export function createAppwriteAdapter(options = {}) {
           throw normalizeError(err)
         }
       },
+  }
+
+  return {
+    api: async () => {
+      throw new Error('Direct API calls are disabled in Appwrite backend mode')
     },
+    state: stateRepo,
+    media: mediaProvider,
+    auth: authInstance,
   }
 }
