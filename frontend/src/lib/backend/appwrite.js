@@ -10,10 +10,14 @@
 import { createLocalAdapter } from './local.js'
 
 export function createAppwriteAdapter(options = {}) {
+  // No default endpoint on purpose: Appwrite Cloud is regional, and the generic
+  // https://cloud.appwrite.io/v1 answers 401 "Project is not accessible in this region"
+  // for a project hosted anywhere else. A wrong default fails at runtime on the device
+  // with an error that does not name the cause; a missing one fails here, by name.
   const endpoint =
     options.endpoint ||
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APPWRITE_ENDPOINT) ||
-    'https://cloud.appwrite.io/v1'
+    ''
 
   const projectId =
     options.projectId ||
@@ -28,8 +32,9 @@ export function createAppwriteAdapter(options = {}) {
 
   const getAccount = async () => {
     if (cachedAccount) return cachedAccount
-    if (!projectId && !options.client) {
-      throw new Error('VITE_APPWRITE_PROJECT_ID is required to initialize Appwrite')
+    if (!options.client) {
+      if (!projectId) throw new Error('VITE_APPWRITE_PROJECT_ID is required to initialize Appwrite')
+      if (!endpoint) throw new Error('VITE_APPWRITE_ENDPOINT is required to initialize Appwrite (Cloud endpoints are regional, e.g. https://sfo.cloud.appwrite.io/v1)')
     }
     const { Client, Account } = await import('appwrite')
     const client = options.client || new Client().setEndpoint(endpoint).setProject(projectId)
