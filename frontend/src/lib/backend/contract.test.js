@@ -59,8 +59,25 @@ export function runContractTests(name, createAdapter, resetStorage = () => {}) {
         }
       })
 
-      it('logout resolves cleanly', async () => {
+      it('logout is idempotent and resolves cleanly', async () => {
         await expect(adapter.auth.logout()).resolves.toBeUndefined()
+        await expect(adapter.auth.logout()).resolves.toBeUndefined()
+      })
+
+      it('logoutEverywhere resolves cleanly', async () => {
+        await expect(adapter.auth.logoutEverywhere()).resolves.toBeUndefined()
+      })
+
+      it('supports email/password auth interface when declared', () => {
+        if (adapter.auth.supportsEmailPassword) {
+          expect(typeof adapter.auth.loginWithEmail).toBe('function')
+        }
+      })
+
+      it('supports OAuth interface when declared', () => {
+        if (adapter.auth.supportsOAuth) {
+          expect(typeof adapter.auth.loginWithOAuth).toBe('function')
+        }
       })
     })
 
