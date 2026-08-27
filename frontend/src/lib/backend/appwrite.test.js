@@ -203,6 +203,82 @@ describe('Appwrite Adapter', () => {
     })
   })
 
+  describe('Offline session survival', () => {
+    // Verified on device: with no connection the app sent the user back to the
+    // login screen even though the session was alive — reconnecting then failed
+    // with 409 "session is active". A network failure is not a missing session.
+    it('keeps the last known user when the network fails', async () => {
+      const store = new Map()
+      let online = true
+      const account = {
+        async get() {
+          if (!online) throw new TypeError('Failed to fetch')
+          return { $id: 'u1', email: 'a@b.com', name: 'Alex' }
+        },
+      }
+      const adapter = createAppwriteAdapter({ account, projectId: 'p', storage: store })
+
+      expect((await adapter.auth.currentUser())?.id).toBe('u1')
+
+      online = false
+      const offline = await adapter.auth.currentUser()
+      expect(offline?.id).toBe('u1')
+    })
+
+    it('returns null when the server says the session is gone', async () => {
+      const store = new Map()
+      store.set('gym_appwrite_user', JSON.stringify({ id: 'stale', name: 'Stale' }))
+      const account = {
+        async get() {
+          const err = new Error('missing scope (account)')
+          err.code = 401
+          throw err
+        },
+      }
+      const adapter = createAppwriteAdapter({ account, projectId: 'p', storage: store })
+
+      expect(await adapter.auth.currentUser()).toBeNull()
+    })
+
+    it('recovers the active session instead of failing with 409', async () => {
+      const account = {
+        async get() {
+          return { $id: 'u1', email: 'a@b.com', name: 'Alex' }
+        },
+        async createEmailPasswordSession() {
+          const err = new Error('Creation of a session is prohibited when a session is active.')
+          err.code = 409
+          throw err
+        },
+      }
+      const adapter = createAppwriteAdapter({ account, projectId: 'p', storage: new Map() })
+
+      const user = await adapter.auth.loginWithEmail('a@b.com', 'pw')
+      expect(user.id).toBe('u1')
+    })
+  })
+
+  describe('Sign-out clears the offline fallback', () => {
+    it('does not let a signed-out user back in while offline', async () => {
+      const store = new Map()
+      let online = true
+      const account = {
+        async get() {
+          if (!online) throw new TypeError('Failed to fetch')
+          return { $id: 'u1', email: 'a@b.com', name: 'Alex' }
+        },
+        async deleteSession() { return {} },
+      }
+      const adapter = createAppwriteAdapter({ account, projectId: 'p', storage: store })
+
+      await adapter.auth.currentUser()
+      await adapter.auth.logout()
+
+      online = false
+      expect(await adapter.auth.currentUser()).toBeNull()
+    })
+  })
+
   describe('OAuth Flow and Deep Links', () => {
     it('opens system browser with properly formed OAuth token URL on native platform', async () => {
       const openSpy = vi.fn().mockResolvedValue(undefined)

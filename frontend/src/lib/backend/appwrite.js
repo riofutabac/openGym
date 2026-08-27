@@ -32,6 +32,39 @@ export function createAppwriteAdapter(options = {}) {
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APPWRITE_OAUTH_PROVIDER) ||
     ''
 
+  // Last-known user, so a dead network is not mistaken for a dead session.
+  const USER_KEY = 'gym_appwrite_user'
+  const store = options.storage || (typeof localStorage !== 'undefined' ? localStorage : null)
+
+  const readCachedUser = () => {
+    try {
+      const raw = store?.get ? store.get(USER_KEY) : store?.getItem(USER_KEY)
+      return raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null
+    } catch {
+      return null
+    }
+  }
+
+  const writeCachedUser = (user) => {
+    try {
+      const val = JSON.stringify(user)
+      if (store?.set) store.set(USER_KEY, val)
+      else store?.setItem?.(USER_KEY, val)
+    } catch { /* ignore */ }
+  }
+
+  const clearCachedUser = () => {
+    try {
+      if (store?.delete) store.delete(USER_KEY)
+      else store?.removeItem?.(USER_KEY)
+    } catch { /* ignore */ }
+  }
+
+  // Appwrite answers 401 when the session is genuinely gone. Anything else —
+  // a TypeError from fetch, a timeout, a 5xx — means we could not ask, which is
+  // not the same answer and must not sign the user out.
+  const isSessionGone = (err) => (err?.code || err?.status) === 401
+
   const fallbackLocal = createLocalAdapter()
   const stateRepo = options.state || fallbackLocal.state
   const mediaProvider = options.media || fallbackLocal.media
@@ -93,10 +126,18 @@ export function createAppwriteAdapter(options = {}) {
         try {
           const account = await getAccount()
           const acc = await account.get()
-          return mapUser(acc)
-        } catch {
-          // On 401 or offline network failure, gracefully return null
-          return null
+          const user = mapUser(acc)
+          if (user) writeCachedUser(user)
+          return user
+        } catch (err) {
+          if (isSessionGone(err)) {
+            clearCachedUser()
+            return null
+          }
+          // Could not reach Appwrite: trust the last session we saw. Signing the
+          // user out here would lock them out of the app precisely when offline,
+          // which is where the PRD says it has to keep working.
+          return readCachedUser()
         }
       },
 
@@ -109,7 +150,9 @@ export function createAppwriteAdapter(options = {}) {
           await account.create(userId, email, password, name || '')
           await account.createEmailPasswordSession(email, password)
           const acc = await account.get()
-          return mapUser(acc)
+          const user = mapUser(acc)
+          if (user) writeCachedUser(user)
+          return user
         } catch (err) {
           throw normalizeError(err)
         }
@@ -131,9 +174,18 @@ export function createAppwriteAdapter(options = {}) {
       async loginWithEmail(email, password) {
         try {
           const account = await getAccount()
-          await account.createEmailPasswordSession(email, password)
+          try {
+            await account.createEmailPasswordSession(email, password)
+          } catch (err) {
+            // 409: a session is already active — which is what happens after the
+            // app fell back to the login screen while offline. The session was
+            // never gone, so adopt it instead of reporting a failure.
+            if ((err?.code || err?.status) !== 409) throw err
+          }
           const acc = await account.get()
-          return mapUser(acc)
+          const user = mapUser(acc)
+          if (user) writeCachedUser(user)
+          return user
         } catch (err) {
           throw normalizeError(err)
         }
@@ -220,6 +272,9 @@ export function createAppwriteAdapter(options = {}) {
       },
 
       async logout() {
+        // Cleared first and unconditionally: a signed-out user must not be let
+        // back in by the offline fallback if the request itself fails.
+        clearCachedUser()
         try {
           const account = await getAccount()
           await account.deleteSession('current')
@@ -234,6 +289,7 @@ export function createAppwriteAdapter(options = {}) {
         try {
           const account = await getAccount()
           await account.deleteSessions()
+          clearCachedUser()
         } catch (err) {
           throw normalizeError(err)
         }
