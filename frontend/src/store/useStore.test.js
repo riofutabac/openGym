@@ -25,14 +25,20 @@ describe('useStore boot() and lifecycle', () => {
     useStore.getState().setGuest(false)
   })
 
-  describe('Local / Mobile / Demo fresh install', () => {
-    it('initializes fresh install as guest on local adapter', async () => {
-      const adapter = createLocalAdapter({ mockCapacitor: false })
-      const user = await adapter.auth.currentUser()
+  describe('Session resolution across builds', () => {
+    it('initializes as guest only in DEMO mode', async () => {
+      const demoAdapter = createLocalAdapter({ mockDemo: true })
+      const user = await demoAdapter.auth.currentUser()
       expect(user).toEqual({ id: 'guest', name: 'Guest', guest: true })
     })
 
-    it('boot() marks app as guest when local adapter returns guest user (mobile/demo)', async () => {
+    it('returns null on fresh install in non-demo local adapter', async () => {
+      const adapter = createLocalAdapter({ mockDemo: false })
+      const user = await adapter.auth.currentUser()
+      expect(user).toBeNull()
+    })
+
+    it('boot() marks app as guest when adapter returns guest user (DEMO build)', async () => {
       vi.spyOn(auth, 'currentUser').mockResolvedValue({ id: 'guest', name: 'Guest', guest: true })
       vi.spyOn(stateRepo, 'load').mockResolvedValue(null)
 
@@ -41,30 +47,40 @@ describe('useStore boot() and lifecycle', () => {
 
       await useStore.getState().boot()
 
-      // On a fresh install with local backend (mobile/demo), guest mode is activated so authed = user || isGuest is true
       expect(useStore.getState().isGuest()).toBe(true)
       expect(useStore.getState().user).toBeNull()
       expect(useStore.getState().ready).toBe(true)
     })
 
-    it('boot() authenticates user in server mode when session exists', async () => {
-      vi.spyOn(auth, 'currentUser').mockResolvedValue({ id: 'u1', name: 'Duarte', admin: true })
-      vi.spyOn(stateRepo, 'load').mockResolvedValue(null)
-
-      await useStore.getState().boot()
-
-      expect(useStore.getState().user).toEqual({ id: 'u1', name: 'Duarte', admin: true })
-      expect(useStore.getState().isGuest()).toBe(false)
-      expect(useStore.getState().ready).toBe(true)
-    })
-
-    it('boot() stays in login/unauthenticated state in server mode when no session exists', async () => {
+    it('boot() requires account on mobile / Appwrite when no session exists', async () => {
       vi.spyOn(auth, 'currentUser').mockResolvedValue(null)
       vi.spyOn(stateRepo, 'load').mockResolvedValue(null)
 
       await useStore.getState().boot()
 
+      // When no active Appwrite/server session, user remains unauthenticated
       expect(useStore.getState().user).toBeNull()
+      expect(useStore.getState().isGuest()).toBe(false)
+      expect(useStore.getState().ready).toBe(true)
+    })
+
+    it('boot() authenticates user when session exists', async () => {
+      vi.spyOn(auth, 'currentUser').mockResolvedValue({
+        id: 'u_appwrite_1',
+        name: 'Alex',
+        email: 'alex@example.com',
+        admin: false,
+      })
+      vi.spyOn(stateRepo, 'load').mockResolvedValue(null)
+
+      await useStore.getState().boot()
+
+      expect(useStore.getState().user).toEqual({
+        id: 'u_appwrite_1',
+        name: 'Alex',
+        email: 'alex@example.com',
+        admin: false,
+      })
       expect(useStore.getState().isGuest()).toBe(false)
       expect(useStore.getState().ready).toBe(true)
     })

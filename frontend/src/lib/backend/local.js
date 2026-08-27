@@ -13,9 +13,11 @@ const FILE = 'opengym-state.json'
 const IMG_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IMG_BASE) || 'img/'
 const GIF_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GIF_BASE) || 'gif/'
 const IS_MOBILE_ENV = typeof import.meta !== 'undefined' && import.meta.env?.VITE_MOBILE === '1'
+const IS_DEMO_ENV = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO === '1'
 
 export function createLocalAdapter(options = {}) {
   const isMobile = options.mockCapacitor !== undefined ? options.mockCapacitor : IS_MOBILE_ENV
+  const isDemo = options.mockDemo !== undefined ? options.mockDemo : IS_DEMO_ENV
   const storageKey = options.storageKey || DEFAULT_KEY
 
   // In-memory fallback if localStorage is unavailable (e.g. node test environments)
@@ -135,11 +137,14 @@ export function createLocalAdapter(options = {}) {
         try {
           const raw = getStorageItem('gym_user')
           if (raw) return typeof raw === 'string' ? JSON.parse(raw) : raw
-          // Local mode (mobile/demo) defaults to guest profile on fresh install
-          return { id: 'guest', name: 'Guest', guest: true }
+          // Guest mode is strictly restricted to DEMO builds
+          if (isDemo || getStorageItem('gym_guest') === '1') {
+            return { id: 'guest', name: 'Guest', guest: true }
+          }
         } catch {
-          return { id: 'guest', name: 'Guest', guest: true }
+          return isDemo ? { id: 'guest', name: 'Guest', guest: true } : null
         }
+        return null
       },
 
       async register(name) {
