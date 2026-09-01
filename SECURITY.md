@@ -48,11 +48,8 @@ Please do not disclose security issues publicly before they have been addressed.
   - Queries for another user's rows return `404 Not Found` (Appwrite prevents existence disclosure and access).
 - **Offline Data Storage & Mobile Synchronization**:
   - Mobile APK stores offline records in private device storage with durable sync queue drained upon reconnection.
-- **No Telemetry**:
-  - openGym contains zero analytics trackers or third-party telemetry.
+### Access Control & Operational Boundaries
 
-### Known Limitations
-
-- **Open Registration by default**: Appwrite projects default to open user registration. For private or invite-only instances, user registration should be controlled in your Appwrite Console.
+- **Private & Invite-Only Instances**: Controlled via Appwrite User Limit policy (prohibiting open public signups) and operator scripts (`scripts/invite-user.mjs`) using Server API keys.
 - **HTTPS Required for Web Deployments**: TLS termination is the reverse proxy's responsibility. Browsers require HTTPS for secure cookie handling and native APIs like Wake Lock.
 - **Guest Mode Storage**: Guest mode stores data unencrypted in the browser's `localStorage` and is evicted if browser cache is cleared.

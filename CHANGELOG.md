@@ -11,11 +11,14 @@ Full backend migration to Appwrite (Cloud / Self-hosted) with granular document 
 
 ### Native Mobile Experience & Offline Durability
 - 📱 **Durable Offline Sync Queue**: Log workouts offline without connectivity; sessions are persisted locally and automatically drained to Appwrite upon reconnection.
-- ⏱️ **OS-Level Rest Timer & Persistent Status Card**: Rest alarms fire reliably when the phone is locked (`@capacitor/local-notifications` with high importance channel), with lockscreen controls (`+15s`, `Skip rest`) and a silent persistent notification card for ongoing workouts.
+- ⏱️ **OS-Level Rest Timer & Persistent Status Card**: Rest alarms fire reliably when the phone is locked (`@capacitor/local-notifications` with high importance channel), with lockscreen controls (`+15s`, `Skip rest`), interactive exact alarm permission setting, and a silent persistent notification card for ongoing workouts.
+
+### Shared Instances & Access Control
+- 👥 **Invite-Only Access Control**: Managed via Appwrite User Limit policy with CLI operator scripts (`scripts/invite-user.mjs`, `scripts/block-user.mjs`) without deploying server secrets.
 
 ### Infrastructure & Cleanup
 - 🧹 **Custom Backend Retirement**: Removed `api/` and `data/` directories; `docker-compose.yml` now runs a clean, static web server with SPA fallback.
-- 📦 **100% Test Coverage**: All 316 unit tests passing across all repository, sync, and progression layers.
+- 📦 **100% Test Coverage**: All 319 unit tests passing across all repository, sync, mobile, and progression layers.
 
 ## v1.2.4 — 2026-08-01
 

@@ -6,6 +6,8 @@ import {
   clearOngoingWorkoutNotification,
   onNotificationAction,
   syncReminder,
+  checkExactNotificationSetting,
+  openExactAlarmSettings,
   REST_NOTIFICATION_ID,
   REST_CHANNEL_ID,
   WORKOUT_CHANNEL_ID,
@@ -298,10 +300,37 @@ describe('mobile.js — Android plugin proxy trap', () => {
     expect(plugin.cancel).toHaveBeenCalled()
   })
 
-  it('subscribes to actions without ever awaiting the raw proxy', async () => {
+  it('checks exact notification setting and reports permission', async () => {
+    const plugin = {
+      checkPermissions: vi.fn().mockResolvedValue({ display: 'granted' }),
+      checkExactNotificationSetting: vi.fn().mockResolvedValue({ exact_alarm: 'granted' }),
+    }
+    const res = await checkExactNotificationSetting({ plugin })
+    expect(res).toEqual({ display: 'granted', exact: true })
+  })
+
+  it('opens exact alarm settings and returns granted status', async () => {
+    const plugin = {
+      changeExactNotificationSetting: vi.fn().mockResolvedValue({ exact_alarm: 'granted' }),
+    }
+    const res = await openExactAlarmSettings({ plugin })
+    expect(res).toBe(true)
+    expect(plugin.changeExactNotificationSetting).toHaveBeenCalled()
+  })
+
+  it('checks exact notification setting without ever awaiting the raw proxy', async () => {
     const plugin = thenableProxy()
-    onNotificationAction(() => {}, { plugin })
-    await Promise.resolve(); await Promise.resolve(); await Promise.resolve()
-    expect(plugin.addListener).toHaveBeenCalled()
+    plugin.checkExactNotificationSetting = vi.fn().mockResolvedValue({ exact_alarm: 'granted' })
+    const res = await checkExactNotificationSetting({ plugin })
+    expect(res).toEqual({ display: 'granted', exact: true })
+  })
+
+  it('opens exact alarm settings without ever awaiting the raw proxy', async () => {
+    const plugin = thenableProxy()
+    plugin.changeExactNotificationSetting = vi.fn().mockResolvedValue({ exact_alarm: 'granted' })
+    const res = await openExactAlarmSettings({ plugin })
+    expect(res).toBe(true)
+    expect(plugin.changeExactNotificationSetting).toHaveBeenCalled()
   })
 })
+

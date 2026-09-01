@@ -7,7 +7,7 @@ import { effortOf } from '../lib/history.js'
 import { wakeLockSupported } from '../lib/wakelock.js'
 import { t, LANGS, INSTR_LANGS } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
-import { MOBILE, shareExport, syncReminder, checkExactNotificationSetting, requestNotificationPermissions } from '../lib/mobile.js'
+import { MOBILE, shareExport, syncReminder, checkExactNotificationSetting, requestNotificationPermissions, openExactAlarmSettings } from '../lib/mobile.js'
 import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
 import { media } from '../lib/backend/index.js'
 import Icon from '../components/Icon.jsx'
@@ -204,11 +204,22 @@ function MobileReminderCard({ S, update, toast }) {
     setReminder({ on })
   }
 
+  const handleAlarmClick = async () => {
+    if (exactSetting?.display !== 'granted') {
+      await handleEnablePermissions()
+    } else if (exactSetting?.exact === false) {
+      await openExactAlarmSettings()
+      checkExactNotificationSetting().then(setExactSetting).catch(() => {})
+    }
+  }
+
   const alarmSubtitle = exactSetting?.display !== 'granted'
     ? t('Notifications disabled — tap to grant permission')
     : exactSetting?.exact === false
-    ? t('Standard alarms (may be slightly delayed by system battery saver)')
+    ? t('Standard alarms — tap to allow exact alarms in Android settings')
     : t('Exact alarms active — rings on time with screen locked')
+
+  const needsAlarmAction = exactSetting?.display !== 'granted' || exactSetting?.exact === false
 
   return (
     <Section title={t('Notifications')}
@@ -225,7 +236,7 @@ function MobileReminderCard({ S, update, toast }) {
             onChange={e => setReminder({ time: e.target.value })} />
         </Row>
       )}
-      <Row icon="timer" iconTint={exactSetting?.display === 'granted' ? 'var(--pink)' : 'var(--red)'} title={t('Rest timer alarm')} subtitle={alarmSubtitle} onClick={exactSetting?.display !== 'granted' ? handleEnablePermissions : undefined} />
+      <Row icon="timer" iconTint={exactSetting?.display === 'granted' ? 'var(--pink)' : 'var(--red)'} title={t('Rest timer alarm')} subtitle={alarmSubtitle} accessory={needsAlarmAction ? 'chevron' : null} onClick={needsAlarmAction ? handleAlarmClick : undefined} />
     </Section>
   )
 }

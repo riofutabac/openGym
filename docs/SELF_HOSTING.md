@@ -56,10 +56,12 @@ Column types below are the ones the app is actually deployed with:
 
 Each row is written with `read`/`update`/`delete` permissions for its owner alone, so on a shared instance one account cannot read another's rows (Appwrite answers `404 Not Found` for unauthorized row access).
 
-### B. Authentication
+### B. Authentication & Security
 - Under **Auth -> Settings**, ensure **Email/Password** is enabled.
+- Disable unused auth methods (`Phone`, `Magic URL`, `Email OTP`, `Anonymous`) to keep attack surface minimal.
 - Set Session Lifetime to 1 year (`31536000` seconds).
 - Configure OAuth providers (e.g. Google) if desired.
+- Set **User Limit** to your current number of active users (closes open public registration while keeping login intact for existing members).
 
 ---
 
@@ -117,7 +119,41 @@ node scripts/upload-media-to-appwrite.mjs \
 
 ---
 
-## 4. Legacy Data Migration (Optional)
+## 4. Shared Instance & Access Control
+
+### A. Closing Public Registration
+In Appwrite Console -> **Auth -> Security**:
+- Set **User Limit** equal to the current user count.
+- Appwrite prohibits any new public signups (`user_count_exceeded`) while keeping all existing accounts active and able to sign in.
+
+### B. Inviting a New User
+Use the operator script with your Server API key (`users.write` scope):
+
+```bash
+node scripts/invite-user.mjs \
+  --email friend@example.com \
+  --name "Friend Name" \
+  --key <api-key-with-users-write-scope> \
+  --project <project-id> \
+  --endpoint https://<region>.cloud.appwrite.io/v1
+```
+
+The script creates the account securely and outputs temporary credentials for the invited member.
+
+### C. Blocking / Unblocking a User
+Block an account immediately (terminates sessions and denies login):
+
+```bash
+# Block user
+node scripts/block-user.mjs --email friend@example.com --key <api-key>
+
+# Unblock user
+node scripts/block-user.mjs --email friend@example.com --unblock --key <api-key>
+```
+
+---
+
+## 5. Legacy Data Migration (Optional)
 
 If migrating from a legacy pre-Appwrite `db.json` database backup:
 

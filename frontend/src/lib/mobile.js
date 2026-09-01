@@ -261,6 +261,20 @@ export async function checkExactNotificationSetting(options = {}) {
   }
 }
 
+// Open Android exact alarm settings screen interactively
+export async function openExactAlarmSettings(options = {}) {
+  try {
+    const { plugin: LocalNotifications } = await getPlugin(options)
+    if (typeof LocalNotifications.changeExactNotificationSetting === 'function') {
+      const res = await LocalNotifications.changeExactNotificationSetting()
+      return res?.exact_alarm === 'granted'
+    }
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
 // Request notification permission from Settings interactively
 export async function requestNotificationPermissions(options = {}) {
   try {
