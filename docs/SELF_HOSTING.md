@@ -10,17 +10,11 @@ In your Appwrite Cloud project (or self-hosted Appwrite):
 
 ### A. Database & Tables
 
-Column types below are the ones the app is actually deployed with — they are not
-interchangeable with the obvious alternatives:
+Column types below are the ones the app is actually deployed with:
 
-- `ts`, `start` and `end` hold `Date.now()` values (~1.8e12), which **overflow a 32-bit
-  integer**. They must be `bigint`.
-- The JSON columns are `text` / `mediumtext`, not `string(N)`. A table's in-row size is
-  capped at 65535 bytes, and a handful of large `string` columns exceeds it; `text` types
-  are stored off-row (the deployed `profiles` table uses 1472 of 65535 bytes).
-- Table-level `create("users")` is **required**. Row security governs read/update/delete of
-  each row, but creating a row still needs table-level create permission — with empty table
-  permissions no user can ever write anything.
+- `ts`, `start` and `end` hold `Date.now()` values (~1.8e12), which **overflow a 32-bit integer**. They must be `bigint`.
+- The JSON columns are `text` / `mediumtext`, not `string(N)`. A table's in-row size is capped at 65535 bytes, and a handful of large `string` columns exceeds it; `text` types are stored off-row.
+- Table-level `create("users")` is **required**. Row security governs read/update/delete of each row, but creating a row still needs table-level create permission.
 
 1. Create a database with ID `opengym` (or choose your own and set `VITE_APPWRITE_DATABASE_ID`).
 
@@ -41,8 +35,7 @@ interchangeable with the obvious alternatives:
    - **Row security**: enabled.
    - **Table permissions**: `create("users")` only.
 
-3. Create table **`workouts`** — one row per training session, row ID is the client-generated
-   session id:
+3. Create table **`workouts`** — one row per training session, row ID is the client-generated session id:
 
    | Column | Type | Required |
    |---|---|---|
@@ -61,9 +54,7 @@ interchangeable with the obvious alternatives:
    - **Row security**: enabled.
    - **Table permissions**: `create("users")` only.
 
-Each row is written with `read`/`update`/`delete` permissions for its owner alone, so on a
-shared instance one account cannot read another's rows. Verify this with a second account
-before trusting it: reading another user's row must answer **401**, not an empty list.
+Each row is written with `read`/`update`/`delete` permissions for its owner alone, so on a shared instance one account cannot read another's rows (Appwrite answers `404 Not Found` for unauthorized row access).
 
 ### B. Authentication
 - Under **Auth -> Settings**, ensure **Email/Password** is enabled.
@@ -96,25 +87,7 @@ npm run build
 
 ---
 
-## 3. Data Migration (from legacy db.json)
-
-If you have existing workouts in `data/db.json` or `data/state-<uid>.json`:
-
-```bash
-node scripts/migrate-to-appwrite.mjs \
-  --db data/db.json \
-  --user <source-user-id> \
-  --account <appwrite-user-id> \
-  --endpoint https://<region>.cloud.appwrite.io/v1 \
-  --project <project-id> \
-  --key <server-api-key-with-databases-scope>
-```
-
-The script migrates the profile and all workout rows, re-reads data from Appwrite, and verifies that workout and bodyweight counts match before reporting success.
-
----
-
-## 4. Storage Bucket Setup & Media Upload
+## 3. Storage Bucket Setup & Media Upload
 
 Exercise animations (GIFs) are stored in Appwrite Storage, while static JPGs are bundled directly within the app.
 
@@ -124,13 +97,13 @@ In Appwrite Console:
 2. **Bucket ID**: `exercises`
 3. **Permissions**: Add `read("any")` (public read access so animations can load without session cookies).
 4. **Max File Size**: 5 MB.
-5. **Compression & Encryption**: Disabled (dataset contains pre-compressed binary media).
+5. **Compression & Encryption**: Disabled.
 
 ### B. Upload Media
-Download the dataset and upload the files to your bucket:
+Download the dataset locally and upload the animation files to your bucket:
 
 ```bash
-# 1. Fetch media dataset locally if not already downloaded
+# 1. Fetch media dataset locally (downloads 1324 exercise animations)
 ./scripts/fetch-media.sh
 
 # 2. Upload animations to Appwrite Storage bucket
@@ -142,3 +115,18 @@ node scripts/upload-media-to-appwrite.mjs \
   --dir ./media/gif
 ```
 
+---
+
+## 4. Legacy Data Migration (Optional)
+
+If migrating from a legacy pre-Appwrite `db.json` database backup:
+
+```bash
+node scripts/migrate-to-appwrite.mjs \
+  --db data/db.json \
+  --user <source-user-id> \
+  --account <appwrite-user-id> \
+  --endpoint https://<region>.cloud.appwrite.io/v1 \
+  --project <project-id> \
+  --key <server-api-key-with-databases-scope>
+```

@@ -7,8 +7,8 @@
 **A self-hosted gym & body-weight tracker you actually own.**
 
 Plan your week, run guided workouts, track every set and your body weight over time —
-on your phone, synced across devices, behind your own passkey login.
-No account on someone else's server, no subscription, no ads. Just `docker compose up`.
+on your phone, synced across devices, powered by Appwrite or standalone on your device.
+No subscription, no ads, no telemetry.
 
 <br>
 
@@ -42,17 +42,16 @@ No account on someone else's server, no subscription, no ads. Just `docker compo
 ### [🌐 opengym.duarte-santos.ch](https://opengym.duarte-santos.ch) · [▶ Try the live demo](https://duartesantos8.github.io/openGym/)
 
 No signup, nothing to install — it runs entirely in your browser on example data.<br>
-<sub>There's no server behind the demo, so passkey sign-in, sync across devices and the
-admin dashboard only exist in a self-hosted instance.</sub>
+<sub>There's no server behind the demo, so authentication and multi-device sync run on your own Appwrite instance or local storage.</sub>
 
 </div>
 
 ## Why
 
 Most workout apps lock your data behind a login on their servers, nag you to upgrade, or
-disappear when the startup does. openGym is the opposite: **it runs on your box, your data
-stays in a folder you control, and it's yours to fork.** It still feels modern — installable
-as a home-screen app, passkey sign-in, offline support, sync across your phone and laptop.
+disappear when the startup does. openGym is the opposite: **it runs on your box or device,
+your data is strictly yours, and it's free and open source.** It still feels modern — installable
+as a home-screen app, offline support with durable sync, native rest alarms, and multi-device sync.
 
 ## Features
 
@@ -74,14 +73,12 @@ as a home-screen app, passkey sign-in, offline support, sync across your phone a
 - ✨ **Your own exercises** — a name and a body part is enough; they behave like built-in ones everywhere, with an optional description instead of an animation
 - 🟩 **Activity heatmap** — a GitHub-style year view, shaded by time spent training
 - 💪 **Muscle map** — a front-and-back body diagram shaded by how much work each muscle got, over a week, a month or all time. It names the muscles you *haven't* trained in that period, previews what a routine hits while you build it, and shows what you just trained when you finish. Male or female figure, your pick
-- 🔔 **Push notifications** — rest-timer alerts even with the app closed, plus an optional reminder on days you have a workout planned but haven't logged one. Opt in per profile; keys are generated on first run, nothing to configure
-- 🔑 **Passkeys, not passwords** — Face ID / Touch ID / fingerprint login; each profile keeps its own data, synced across devices
-- 🛠️ **Admin dashboard** (optional) — for whoever runs the instance: who's training right now, per-user history, disable accounts, and invite-only signup. Off by default, so a fresh instance stays open with no admin
+- 🔔 **Native rest notifications & sticky workout card** — rest-timer alarms that fire with sound/vibration even when your phone is locked or WebView is suspended, plus lock-screen actions (`+15s`, `Skip rest`) and a silent persistent status card
 - 🎨 **Designed, not assembled** — light/dark themes and 8 accent colors saved to your profile, over a hand-drawn icon set instead of emoji, so it looks the same on every phone
 - 🌍 **12 languages** — full UI translation (EN, DE, ES, FR, IT, PT, PL, TR, RU, ZH, KO, HI); exercise instructions localized in 10 of them, loaded on demand so the app stays fast
 - 📥 **Bring your history with you** — import from **FitNotes** (Android and iOS), **Strong** and **Hevy**, or body weight straight out of an **Apple Health** export. Exercise names are matched against the library and anything unrecognised becomes one of your own exercises, so nothing in the file is dropped
 - 📦 **Yours to keep** — one-tap JSON export/import, guest mode, **no telemetry**
-- 📱 **Standalone Android app** — the whole tracker as a sideloadable APK: no account, no server, data on the phone, native workout reminders ([download](https://opengym.duarte-santos.ch))
+- 📱 **Standalone Android app** — the whole tracker as a sideloadable APK: works fully offline, durable sync queue against Appwrite, native workout reminders ([download](https://opengym.duarte-santos.ch))
 
 ## Quick start (self-host)
 
@@ -91,36 +88,26 @@ You need [Docker](https://docs.docker.com/get-docker/) with Compose.
 git clone https://github.com/DuarteSantos8/openGym
 cd openGym
 cp .env.example .env
-docker compose pull   # grab prebuilt images (amd64 + arm64) — skip to build from source instead
+docker compose pull   # grab prebuilt web image (amd64 + arm64) — or build from source
 docker compose up -d
 ```
 
-Open **http://localhost:8080**, tap **Create profile**, and you're in. First launch downloads
-the exercise media (~140 MB) once. Prefer building the images yourself instead of pulling from
-`ghcr.io`? Drop the `pull` step and run `docker compose up -d --build` — you don't need Node or
-a build step locally either way.
+Open **http://localhost:8080**, sign in or create an account, and you're in. To build the images locally instead of pulling from `ghcr.io`, run `docker compose up -d --build`.
 
-> Want it reachable from your phone over the internet with passkeys? You'll need an HTTPS
-> domain — a two-line change in `.env`. See **[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)**.
+For Appwrite configuration and backend setup, see **[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)**.
 
-## Mobile app (no server at all)
+## Mobile app (Android APK)
 
-The same codebase also builds a **standalone mobile app** (Capacitor): no account, no sync,
-no backend — everything stays on the phone, with native workout-day reminders and share-sheet
-backups. Self-hosting gets you multi-device sync and profiles for friends & family; the
-mobile app is the install-and-done flavor.
+The same codebase builds a **native Android app** (Capacitor) with offline storage, durable background sync, and OS-level alarms:
 
-- **Android:** [**download the APK**](https://opengym.duarte-santos.ch) and sideload it —
-  openGym is deliberately not on the Play Store. Or build it yourself: **[docs/MOBILE.md](docs/MOBILE.md)**.
-- **iPhone:** Apple doesn't allow installing apps outside the App Store, so there is no iOS
-  download. Self-host and add it to your home screen from Safari (it's a full PWA), or build
-  the native app onto your own device from Xcode — see **[docs/MOBILE.md](docs/MOBILE.md)**.
+- **Android:** [**download the APK**](https://opengym.duarte-santos.ch) and sideload it — openGym is deliberately not on the Play Store. Or build it yourself: **[docs/MOBILE.md](docs/MOBILE.md)**.
+- **iOS:** Add it to your home screen from Safari (it's a full PWA), or build the native app onto your own device from Xcode — see **[docs/MOBILE.md](docs/MOBILE.md)**.
 
 ## How it's built
 
-- **frontend/** — React + Vite (React Router + Zustand), with domain-isolated backend adapters under `lib/backend/`.
+- **frontend/** — React 19 + Vite (React Router + Zustand), with domain-isolated backend adapters under `src/lib/backend/`.
 - **Appwrite Backend** — Appwrite Cloud / Self-hosted instance with TablesDB collections (`profiles`, `workouts`) and row-level document security.
-- **Mobile (Android)** — Capacitor native build communicating with Appwrite and persisting native caches.
+- **Mobile (Android)** — Capacitor native build communicating with Appwrite, native local notification channels, and persistent offline sync queue.
 
 ## Your data
 
@@ -138,44 +125,23 @@ All configured via `frontend/.env` (see `frontend/.env.example`):
 | `VITE_APPWRITE_DATABASE_ID` | Appwrite database ID | `opengym` |
 | `VITE_APPWRITE_OAUTH_PROVIDER` | Optional OAuth provider | `google` |
 
-## Roadmap
-
-Rough, community-driven — ideas and PRs welcome:
-
-- [x] Standalone mobile app — Android APK to sideload ([download](https://opengym.duarte-santos.ch)); on iOS as a self-hosted PWA (no store listings planned)
-- [x] Automatic progression programs (linear, Greyskull LP, double progression) with stalls and deloads
-- [x] Estimated 1RM per exercise
-- [ ] Percentage / training-max programming (5/3/1-style) on top of the progression engine
-- [ ] More starter plans (upper/lower, full-body, 5×5)
-- [x] Importers from FitNotes / Strong / Hevy (including the RPE they record), and body weight from Apple Health
-- [x] Effort per set — RIR or RPE, whichever scale you think in
-- [ ] Body measurements (waist, arms…) alongside weight
-- [ ] Per-exercise notes & plate calculator
-- [ ] Exercise instructions in German & Portuguese (UI is translated; upstream dataset doesn't ship these yet)
-
 ## Tech
 
-React 19 + Vite (React Router, Zustand) · Node (no framework) · nginx · Docker Compose ·
-WebAuthn · exercise data from [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset).
-No database server, no cloud dependencies — the frontend builds inside Docker, so self-hosting
-stays a one-command `docker compose up`.
+React 19 + Vite (React Router, Zustand) · Appwrite · nginx · Docker Compose ·
+exercise data from [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset).
+The frontend builds inside Docker, so self-hosting stays a one-command `docker compose up`.
 
 The training logic — progression rules, 1RM estimation, how a logged session is read back —
 lives in pure functions under `frontend/src/lib/` with tests next to them: `npm test` in
 `frontend/`. Vitest is a dev dependency; the app itself ships no runtime dependencies beyond
-React, the router and Zustand.
+React, the router, Zustand, and Appwrite SDK.
 
 ## Community
 
-- **[Q&A](https://github.com/DuarteSantos8/openGym/discussions/categories/q-a)** — self-hosting
-  help, passkey/login trouble, "how do I…". Most login problems turn out to be an `RP_ID`/`ORIGIN`
-  mismatch.
-- **[Ideas](https://github.com/DuarteSantos8/openGym/discussions/categories/ideas)** — features
-  worth talking through before anyone writes code.
-- **[Show and tell](https://github.com/DuarteSantos8/openGym/discussions/categories/show-and-tell)**
-  — your setup, your plan templates, whatever you built on top.
-- **[Issues](https://github.com/DuarteSantos8/openGym/issues)** — bugs, and work that's already
-  been agreed on.
+- **[Q&A](https://github.com/DuarteSantos8/openGym/discussions/categories/q-a)** — self-hosting help, Appwrite setup, "how do I…".
+- **[Ideas](https://github.com/DuarteSantos8/openGym/discussions/categories/ideas)** — features worth talking through before anyone writes code.
+- **[Show and tell](https://github.com/DuarteSantos8/openGym/discussions/categories/show-and-tell)** — your setup, your plan templates, whatever you built on top.
+- **[Issues](https://github.com/DuarteSantos8/openGym/issues)** — bugs, and work that's already been agreed on.
 
 ## Contributing
 
@@ -183,13 +149,10 @@ Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Good first is
 plans, exercise-data languages, import from other trackers. **A ⭐ helps more people find it.**
 
 openGym is free and stays free: AGPL, no subscription, no paid tier, nothing held back for
-sponsors. If it replaced a paid tracker for you and you want to chip in, the Sponsor button at the
-top of the page is there — a star, a bug report or a PR is worth just as much.
+sponsors.
 
 ## License
 
-[GNU AGPL v3.0](LICENSE) — free and open source. You can self-host, use, modify and share it;
-if you run a modified version as a network service, you must offer that version's source under
-the same license. Nobody can turn openGym into a closed, proprietary product.
+[GNU AGPL v3.0](LICENSE) — free and open source.
 
 Exercise images/GIFs are fetched from the upstream dataset and keep their own terms — see [NOTICE.md](NOTICE.md).

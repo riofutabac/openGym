@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Manually download the exercise images (JPG) and animations (GIF) into ./media.
-# You normally DON'T need this — `docker compose up` fetches them automatically.
+# Download the exercise images (JPG) and animations (GIF) into ./media.
+# Required prior to running `scripts/upload-media-to-appwrite.mjs` for self-hosted instances.
 # Source: hasaneyldrm/exercises-dataset (CC).
 set -euo pipefail
 cd "$(dirname "$0")/.."

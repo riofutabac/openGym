@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.3.0 — 2026-09-01
+
+Full backend migration to Appwrite (Cloud / Self-hosted) with granular document security, durable offline sync queue, native rest alarms, and retirement of the custom Node backend.
+
+### Appwrite Backend & Granular Persistence
+- ☁️ **Appwrite Authentication & Databases**: Replaced custom Node backend with Appwrite Auth and TablesDB (`profiles` and `workouts` tables).
+- 🛡️ **Row-Level Document Security**: Every user's routines and workouts are protected with strict row permissions (`Permission.read/update/delete(Role.user(uid))`).
+- 🗄️ **Storage Bucket**: Exercise GIF animations are served from Appwrite Storage (`exercises` bucket) with local LRU caching on device.
+
+### Native Mobile Experience & Offline Durability
+- 📱 **Durable Offline Sync Queue**: Log workouts offline without connectivity; sessions are persisted locally and automatically drained to Appwrite upon reconnection.
+- ⏱️ **OS-Level Rest Timer & Persistent Status Card**: Rest alarms fire reliably when the phone is locked (`@capacitor/local-notifications` with high importance channel), with lockscreen controls (`+15s`, `Skip rest`) and a silent persistent notification card for ongoing workouts.
+
+### Infrastructure & Cleanup
+- 🧹 **Custom Backend Retirement**: Removed `api/` and `data/` directories; `docker-compose.yml` now runs a clean, static web server with SPA fallback.
+- 📦 **100% Test Coverage**: All 316 unit tests passing across all repository, sync, and progression layers.
+
 ## v1.2.4 — 2026-08-01
 
 The effort ratings you have been recording since v1.2.3 now answer questions, and bodyweight

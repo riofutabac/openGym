@@ -6,7 +6,7 @@ services:
     image: ghcr.io/duartesantos8/opengym-web:latest
     build:
       context: .
-      dockerfile: web/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:80"

@@ -1,0 +1,11 @@
+.git
+.agents
+.claude
+media/gif
+frontend/node_modules
+frontend/dist
+frontend/dist-demo
+frontend/android
+frontend/ios
+api
+data

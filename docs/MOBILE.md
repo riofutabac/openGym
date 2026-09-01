@@ -1,16 +1,16 @@
 # Building the mobile app (iOS / Android)
 
-openGym ships in two flavors from the same codebase:
+openGym ships in two deployment options from the same codebase:
 
-| | **Self-hosted** (this repo's default) | **Mobile app** (`VITE_MOBILE=1`) |
+| | **Web App (Self-hosted PWA)** | **Mobile App (Android APK / iOS)** (`VITE_MOBILE=1`) |
 |---|---|---|
-| Runs | in any browser, against your own server | natively on iPhone / Android (Capacitor shell) |
-| Accounts | passkey sign-in, one profile per person | none — the phone *is* the account |
-| Data | synced to your server, readable on desktop | stays on the device (file in the app's private storage) |
-| Reminders | Web Push from your server | native local notifications, no server involved |
+| Runs | in any browser / PWA home screen | natively on Android / iOS (Capacitor shell) |
+| Accounts | Appwrite Auth (Email / OAuth) | Appwrite Auth (Email / OAuth) + Guest demo mode |
+| Data | synced to Appwrite Databases | synced with durable offline queue and local caching |
+| Reminders | Browser alerts | native OS local notifications & alarm channels |
 | Exercise media | served by Appwrite Storage | 1324 JPGs (11 MB) bundled in APK; GIFs cached over Wi-Fi (max 50 MB) |
 
-The mobile flavor talks directly to Appwrite with durable accounts and offline caching.
+The mobile flavor communicates directly with Appwrite with durable accounts and offline caching.
 All 1324 exercise JPG images travel directly inside the APK for instant offline rendering,
 while animated GIFs are cached dynamically with an LRU budget and Wi-Fi downloading rules.
 
@@ -33,7 +33,7 @@ npx cap open android        # opens Android Studio → run on emulator or device
 npx cap open ios            # opens Xcode (Mac only) → set your signing team, then run
 ```
 
-`npm run build:mobile` bakes the CDN media base into the bundle and copies the web build
+`npm run build:mobile` bakes the mobile configuration and copies the web build
 into both native projects — re-run it after every web-code change before building natively.
 
 > **Heads-up:** after `build:mobile`, `frontend/dist` contains the *mobile* bundle.
@@ -48,9 +48,6 @@ app background). Generate all platform assets from it on a machine with the tool
 cd frontend
 npx @capacitor/assets generate --iconBackgroundColor '#0c0e12' --splashBackgroundColor '#0c0e12'
 ```
-
-(If the generator won't take the SVG directly, export it to `resources/icon.png` at
-1024×1024 first — any image tool can do it.)
 
 ## Distribution — deliberately no app stores
 
@@ -84,7 +81,7 @@ Apple does not allow installing apps outside the App Store, so there is no `.ipa
 that would simply install. Your free options:
 
 - **Self-host + PWA** (recommended): open your instance in Safari → Share → *Add to Home
-  Screen*. Full-screen app, no expiry, plus sync and passkeys.
+  Screen*. Full-screen app, no expiry, plus multi-device sync.
 - **Xcode free signing:** open `ios/` in Xcode with a free Apple ID as the team and run it
   onto your own iPhone. Apple expires the signature after 7 days; re-run from Xcode to renew.
 - **AltStore:** automates that 7-day re-signing over Wi-Fi via a Mac companion app.
@@ -97,6 +94,5 @@ that would simply install. Your free options:
 - **License:** openGym is AGPL-3.0, which by itself sits badly with app-store terms of
   service. `NOTICE.md` carries an app-store exception (an additional permission under
   AGPL §7) granted by the copyright holder — relevant only if store distribution ever happens.
-- The app requests notification permission only when the workout-day reminder is switched
-  on, and (on Android) declares `SCHEDULE_EXACT_ALARM` so the reminder fires to the minute
-  where the user allows it.
+- The app requests notification permission only when the workout-day reminder or rest timer is switched
+  on in Settings.
