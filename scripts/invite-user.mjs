@@ -3,6 +3,13 @@
 //
 // Operator script to invite and create a new user on a private openGym instance.
 //
+// Do NOT add user-limit juggling here. Public registration is closed by setting the project's
+// user limit to the current account count, but a Server API key creates users through the admin
+// path, which bypasses that limit — verified live against a project whose limit was already met.
+// So this script just creates the account. The count then sits above the limit, which keeps public
+// signup closed for free. Raising the limit to "make room" would reopen public registration for as
+// long as it stayed raised, which is the hole the limit exists to close.
+//
 // Usage:
 //   node scripts/invite-user.mjs \
 //     --email user@example.com \

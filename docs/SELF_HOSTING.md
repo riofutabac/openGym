@@ -140,6 +140,13 @@ node scripts/invite-user.mjs \
 
 The script creates the account securely and outputs temporary credentials for the invited member.
 
+**The user limit does not need to be raised first, and must not be.** A Server API key creates
+users through the admin path, which bypasses the limit — verified against a live project whose
+limit was already met. That has a useful consequence: after each invite the user count sits *above*
+the limit, so public registration stays closed permanently with no further maintenance. Raising the
+limit to make room would reopen public signup for as long as it stayed raised, which is exactly the
+hole this section closes.
+
 ### C. Blocking / Unblocking a User
 Block an account immediately (terminates sessions and denies login):
 
