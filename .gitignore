@@ -64,6 +64,7 @@ logs/
 # AI Assistants & Agent Caches
 .agents/
 .claude/
+.impeccable/
 skills-lock.json
 .gemini/
 
