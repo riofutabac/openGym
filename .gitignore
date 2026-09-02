@@ -83,6 +83,9 @@ frontend/android/build/
 frontend/android/local.properties
 frontend/android/.cxx/
 frontend/android/captures/
+frontend/android/app/src/main/assets/
+frontend/android/app/src/main/res/xml/config.xml
+frontend/android/capacitor-cordova-android-plugins/
 frontend/ios/DerivedData/
 frontend/ios/App/Pods/
 frontend/ios/App/build/
