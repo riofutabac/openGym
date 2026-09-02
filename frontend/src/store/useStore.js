@@ -117,6 +117,29 @@ export const useStore = create((set, get) => {
       set({ user: u })
     },
 
+    async deleteWorkout(id) {
+      if (!id) return
+      const strId = String(id)
+      syncQueue.markWorkoutDeleted(strId)
+      get().update(s => {
+        s.workouts = (s.workouts || []).filter(w => String(w.id) !== strId)
+      }, false)
+      set({
+        pendingCount: syncQueue.getPendingCount(get().S.workouts),
+        failedWorkouts: syncQueue.getFailedWorkouts(),
+      })
+
+      const user = get().user
+      if (user?.id && stateRepo.deleteWorkout) {
+        try {
+          await stateRepo.deleteWorkout(user.id, strId)
+          syncQueue.confirmWorkoutDeleted(strId)
+        } catch (err) {
+          // Stays in pending deleted queue to drain later
+        }
+      }
+    },
+
     async pushState() {
       clearTimeout(pushTm)
       const user = get().user
@@ -209,13 +232,18 @@ export const useStore = create((set, get) => {
           const localWorkouts = S.workouts || []
           const localMap = new Map(localWorkouts.map(w => [String(w.id), w]))
           const remoteList = remoteWorkouts || []
+          const deletedIds = syncQueue.getDeletedIds()
 
-          // Confirm all remote IDs in syncQueue
-          syncQueue.markWorkoutsSynced(remoteList.map(rw => String(rw.id)))
+          // Confirm all remote IDs in syncQueue (except ones marked deleted)
+          syncQueue.markWorkoutsSynced(
+            remoteList.map(rw => String(rw.id)).filter(id => !deletedIds.has(id))
+          )
 
           for (const rw of remoteList) {
-            if (!localMap.has(String(rw.id))) {
-              localMap.set(String(rw.id), rw)
+            const rwId = String(rw.id)
+            if (deletedIds.has(rwId)) continue
+            if (!localMap.has(rwId)) {
+              localMap.set(rwId, rw)
             }
           }
 

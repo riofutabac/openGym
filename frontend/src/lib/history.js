@@ -1,6 +1,7 @@
 // Pure helpers over the state object S (ported 1:1 from the vanilla app).
 import { todayISO, isoOf, weekKey, fmtNum } from './format.js'
 import { isCardio, isBodyweightEq } from './exercises.js'
+import { nextRoutine } from './rotation.js'
 import { t } from './i18n.js'
 
 // How an exercise is logged (issue #16). This used to be derived from the body part alone,
@@ -107,6 +108,18 @@ export function setLabel(id, s, cfg) {
   }
   return `${fmtNum(s.w || 0)}×${reps}` + effortTail(s)
 }
+
+// Resolve rest duration in seconds for an exercise entry or config, falling back to S.restSec
+export function effectiveRestSec(cfg, fallback = 90) {
+  if (cfg && cfg.target && cfg.target.restSec != null && Number(cfg.target.restSec) > 0) {
+    return Number(cfg.target.restSec)
+  }
+  if (cfg && cfg.restSec != null && Number(cfg.restSec) > 0) {
+    return Number(cfg.restSec)
+  }
+  return Number(fallback) || 90
+}
+
 // Default config for a freshly added exercise.
 export function defaultConfig(id, mode) {
   const m = mode || modeOf({ id })
@@ -159,11 +172,14 @@ export function bestWeightFor(S, exId) {
   return best
 }
 export function effectiveRoutineId(S, iso) {
-  const ov = S.dayPlan[iso]
+  const ov = S.dayPlan ? S.dayPlan[iso] : undefined
   if (ov === 'rest') return null
-  if (ov && S.routines.some(r => r.id === ov)) return ov
-  const wd = new Date(iso + 'T12:00:00').getDay()
-  return S.week[wd] || null
+  if (ov && (S.routines || []).some(r => r.id === ov)) return ov
+  if (S.week) {
+    const wd = new Date(iso + 'T12:00:00').getDay()
+    if (S.week[wd]) return S.week[wd]
+  }
+  return nextRoutine(S)?.id || null
 }
 export function effectiveRoutine(S, iso) {
   const id = effectiveRoutineId(S, iso)

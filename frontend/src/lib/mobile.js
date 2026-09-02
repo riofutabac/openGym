@@ -218,11 +218,22 @@ export async function updateOngoingWorkoutNotification(payload = {}, options = {
     const name = payload.name || t('Workout')
     const resting = typeof payload.restEndsAt === 'number' && payload.restEndsAt > Date.now()
 
+    let title
+    if (payload.exerciseName && payload.setIndex != null && payload.totalSets) {
+      title = `${payload.exerciseName} · ${t('Set {0}/{1}', payload.setIndex, payload.totalSets)}`
+    } else {
+      title = resting ? t('Resting until {0}', fmtClock(payload.restEndsAt)) : name
+    }
+
+    const body = resting
+      ? t('Resting until {0}', fmtClock(payload.restEndsAt))
+      : (payload.name || t('Workout in progress — tap to return'))
+
     await LocalNotifications.schedule({
       notifications: [{
         id: WORKOUT_ONGOING_ID,
-        title: resting ? t('Resting until {0}', fmtClock(payload.restEndsAt)) : name,
-        body: resting ? name : t('Workout in progress — tap to return'),
+        title,
+        body,
         channelId: WORKOUT_CHANNEL_ID,
         ongoing: true,
         autoCancel: false,

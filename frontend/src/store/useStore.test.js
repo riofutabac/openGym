@@ -225,6 +225,43 @@ describe('useStore boot() and lifecycle', () => {
     })
   })
 
+  describe('deleteWorkout behavior', () => {
+    it('deletes workout locally and calls remote delete without resurrecting in pullState', async () => {
+      const mockDomainRepo = {
+        supportsPerSessionRows: true,
+        deleteWorkout: vi.fn().mockResolvedValue(true),
+        loadProfile: vi.fn().mockResolvedValue(null),
+        listWorkouts: vi.fn().mockResolvedValue([
+          { id: 'w1', d: '2026-01-01', name: 'Workout 1', entries: [] },
+          { id: 'w2', d: '2026-01-02', name: 'Workout 2', entries: [] }
+        ]),
+        saveProfile: vi.fn().mockResolvedValue(true),
+        saveWorkout: vi.fn().mockResolvedValue(true),
+      }
+      Object.assign(stateRepo, mockDomainRepo)
+
+      useStore.setState({
+        user: { id: 'usr_1', name: 'Test User' },
+        S: {
+          ...JSON.parse(JSON.stringify(DEF)),
+          workouts: [
+            { id: 'w1', d: '2026-01-01', name: 'Workout 1', entries: [] },
+            { id: 'w2', d: '2026-01-02', name: 'Workout 2', entries: [] }
+          ]
+        }
+      })
+
+      await useStore.getState().deleteWorkout('w1')
+
+      expect(useStore.getState().S.workouts.map(w => w.id)).toEqual(['w2'])
+      expect(mockDomainRepo.deleteWorkout).toHaveBeenCalledWith('usr_1', 'w1')
+
+      // Now pullState — w1 should NOT be resurrected even if remote returns it
+      await useStore.getState().pullState()
+      expect(useStore.getState().S.workouts.map(w => w.id)).toEqual(['w2'])
+    })
+  })
+
   describe('api() behavior across adapters', () => {
     it('throws descriptive error in local adapter mode without raw fetch fallback', async () => {
       const localAdapter = createLocalAdapter()

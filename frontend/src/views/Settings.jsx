@@ -171,7 +171,7 @@ export default function Settings() {
       <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doImport} />
       <Row icon="share" iconTint="var(--indigo)" title={t('Import from Hevy / Strong')} subtitle={t('Import routine CSV exports from other workout apps.')} accessory="chevron" onClick={() => importRef.current?.click()} />
       <input ref={importRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={ev => importFromApp(ev.target.files?.[0])} />
-      <Row icon="sparkles" iconTint="var(--acc)" title={t('Load starter plan')} subtitle={t('Add a balanced 3-day Push/Pull/Legs program.')} accessory="chevron" onClick={loadStarterPlan} />
+      <Row icon="sparkles" iconTint="var(--acc)" title={t('Load starter plan')} subtitle={t('Load the 4-day Upper/Lower program.')} accessory="chevron" onClick={loadStarterPlan} />
     </Section>
   </div>
 }

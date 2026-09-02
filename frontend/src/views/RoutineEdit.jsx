@@ -1,8 +1,9 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useStore } from '../store/useStore.js'
+import { useUI } from '../store/useUI.js'
 import { exOr } from '../lib/exercises.js'
-import { uid } from '../lib/format.js'
+import { uid, DAYN, DAYS } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import { supersetUnits, cleanupSg, exLine } from '../lib/history.js'
 import { Thumb } from '../components/Media.jsx'
@@ -13,6 +14,9 @@ import { Button, SelectRow } from '../components/ui.jsx'
 import { POLICIES_FOR, POLICY_NAME, POLICY_DESC } from '../lib/progression.js'
 import BodyMap from '../components/BodyMap.jsx'
 import { loadOfRoutine, rankOf, MUSCLE_NAME } from '../lib/muscles.js'
+import { daysSinceDone } from '../lib/rotation.js'
+
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun
 
 export default function RoutineEdit() {
   const nav = useNavigate()
@@ -20,6 +24,8 @@ export default function RoutineEdit() {
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
   const r = S.routines.find(x => x.id === id)
+  const rIndex = S.routines.findIndex(x => x.id === id)
+  const days = r ? daysSinceDone(S, r.id) : null
   useEffect(() => { if (!r) nav('/plan') }, [!!r])
   if (!r) return null
 
@@ -33,18 +39,76 @@ export default function RoutineEdit() {
     cleanupSg(ex)
   })
 
+  const toggleDay = d => {
+    const prevRid = (S.week || {})[d]
+    const prevR = prevRid ? S.routines.find(x => x.id === prevRid) : null
+    const isSelected = (S.week || {})[d] === id
+
+    update(s => {
+      s.week = s.week || {}
+      if (isSelected) {
+        delete s.week[d]
+      } else {
+        s.week[d] = id
+      }
+    })
+
+    if (!isSelected && prevRid && prevRid !== id && prevR) {
+      useUI.getState().toast(t('{0} moved from {1} to {2}', t(DAYN[d]), prevR.name, r.name))
+    }
+  }
+
   const units = supersetUnits(r.ex)
   const unitFirst = new Set(units.filter(u => u.length > 1).map(u => u[0]))
   const inSS = new Set(units.filter(u => u.length > 1).flat())
+
+  const lastDoneLabel = days == null
+    ? t('Never performed')
+    : days === 0
+      ? t('done today')
+      : days === 1
+        ? t('Last done yesterday')
+        : t('Last done {0} days ago', days)
 
   return <div className="narrow">
     <div className="hdr">
       <button className="iconbtn" onClick={() => nav('/plan')} aria-label={t('Plan')}><Icon name="chevronLeft" /></button>
       <div style={{ flex: 1, margin: '0 12px' }}>
         <input className="input" defaultValue={r.name} style={{ fontWeight: 600, fontSize: 20, letterSpacing: '-.021em' }}
-          onChange={e => update(s => { s.routines.find(x => x.id === id).name = e.target.value.trim() || t('Routine') })} />
+          onBlur={e => update(s => { s.routines.find(x => x.id === id).name = e.target.value.trim() || t('Routine') })} />
       </div>
       <button className="iconbtn" aria-label={t('Pick an icon')} onClick={() => glyphPicker(r.emoji, g => update(s => { s.routines.find(x => x.id === id).emoji = g }))}><Icon name={glyphOf(r.emoji)} /></button>
+    </div>
+
+    <div className="row between small muted" style={{ margin: '-6px 4px 14px' }}>
+      <span>{t('Routine {0} of {1} in rotation', rIndex + 1, S.routines.length)}</span>
+      <span>{lastDoneLabel}</span>
+    </div>
+
+    <div className="card" style={{ marginBottom: 16, padding: '12px 14px' }}>
+      <div className="row between" style={{ marginBottom: 4 }}>
+        <span style={{ fontWeight: 600, fontSize: 14 }}>{t('Fixed days of week')}</span>
+        <span className="dim small">{t('Optional')}</span>
+      </div>
+      <div className="dim small" style={{ marginBottom: 10 }}>
+        {t('Assign recurring days or leave empty to follow continuous rotation.')}
+      </div>
+      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        {WEEKDAYS.map(d => {
+          const active = (S.week || {})[d] === id
+          return (
+            <button
+              key={d}
+              type="button"
+              className={'chip' + (active ? ' on' : '')}
+              style={active ? { background: 'var(--acc)', color: 'var(--on-acc)', fontWeight: 600 } : undefined}
+              onClick={() => toggleDay(d)}
+            >
+              {t(DAYS[d])}
+            </button>
+          )
+        })}
+      </div>
     </div>
 
     <div className="sect-b" style={{ marginBottom: 16 }}>

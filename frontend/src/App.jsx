@@ -7,7 +7,8 @@ import { ACCENTS } from './lib/format.js'
 import { setLang, useLang, t } from './lib/i18n.js'
 import { setNav } from './lib/nav.js'
 import { useWakeLock } from './lib/wakelock.js'
-import { startFlow } from './sheets.jsx'
+import { startFlow, onboardingSheet } from './sheets.jsx'
+import { needsOnboarding } from './lib/onboarding.js'
 import Icon from './components/Icon.jsx'
 import { auth } from './lib/backend/index.js'
 import TabBar from './components/TabBar.jsx'
@@ -67,6 +68,25 @@ function Shell() {
               }
             }
           })
+          await CapApp.addListener('backButton', ({ canGoBack }) => {
+            const st = useStore.getState().S
+            const curLoc = window.location.hash || window.location.pathname
+            const isWorkout = curLoc.includes('/workout')
+            const openSheets = useUI.getState().sheets
+            if (openSheets.length > 0) {
+              useUI.getState().closeSheet(openSheets[openSheets.length - 1].id)
+              return
+            }
+            if (st.active && isWorkout) {
+              // Focus mode: protect active workout against accidental back exit
+              return
+            }
+            if (canGoBack) {
+              window.history.back()
+            } else {
+              CapApp.exitApp()
+            }
+          })
         } catch { /* ignore */ }
       }
     }
@@ -75,6 +95,13 @@ function Shell() {
   }, [])
 
   const authed = user || isGuest
+
+  useEffect(() => {
+    if (ready && authed && needsOnboarding(S)) {
+      onboardingSheet()
+    }
+  }, [ready, authed])
+
   if (!ready && !authed) return (
     <div id="app">
       <div style={{ paddingTop: '44vh', display: 'flex', justifyContent: 'center', fontSize: 34, color: 'var(--label-3)' }}>

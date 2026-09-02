@@ -5,26 +5,74 @@ import { t } from '../lib/i18n.js'
 import { useStore } from './useStore.js'
 import { scheduleRestNotification, cancelRestNotification, updateOngoingWorkoutNotification, clearOngoingWorkoutNotification, onNotificationAction, MOBILE } from '../lib/mobile.js'
 
+import { EXIDX } from '../lib/exercises.js'
+
 const activeName = () => useStore.getState().S?.active?.name
+
+export const getActiveWorkoutMeta = () => {
+  const active = useStore.getState().S?.active
+  if (!active) return null
+  const curIdx = active.cur || 0
+  const entry = active.entries[curIdx]
+  const exName = entry ? ((EXIDX[entry.id] || {}).n || entry.id) : active.name
+  const totalSets = entry ? entry.sets.length : 0
+  const setIdx = entry ? Math.min(totalSets, entry.sets.filter(s => s.done).length + 1) : 1
+  return {
+    name: active.name,
+    exerciseName: exName,
+    setIndex: setIdx,
+    totalSets
+  }
+}
+
+let heartbeatInt = null
+
+export const syncWorkoutNotification = (restEndsAt) => {
+  if (!MOBILE) return
+  const meta = getActiveWorkoutMeta()
+  if (!meta) {
+    if (heartbeatInt) { clearInterval(heartbeatInt); heartbeatInt = null }
+    clearOngoingWorkoutNotification().catch(() => {})
+    return
+  }
+  const tm = useUI.getState().timer
+  const endsAt = restEndsAt !== undefined ? restEndsAt : (tm && tm.endsAt > Date.now() ? tm.endsAt : undefined)
+  updateOngoingWorkoutNotification({ ...meta, restEndsAt: endsAt }).catch(() => {})
+
+  if (!heartbeatInt) {
+    heartbeatInt = setInterval(() => {
+      const curMeta = getActiveWorkoutMeta()
+      if (!curMeta) {
+        clearInterval(heartbeatInt)
+        heartbeatInt = null
+        clearOngoingWorkoutNotification().catch(() => {})
+        return
+      }
+      const curTimer = useUI.getState().timer
+      const curEndsAt = curTimer && curTimer.endsAt > Date.now() ? curTimer.endsAt : undefined
+      updateOngoingWorkoutNotification({ ...curMeta, restEndsAt: curEndsAt }).catch(() => {})
+    }, 30000)
+  }
+}
+
+export const stopWorkoutHeartbeat = () => {
+  if (heartbeatInt) { clearInterval(heartbeatInt); heartbeatInt = null }
+  clearOngoingWorkoutNotification().catch(() => {})
+}
 
 const pushRestTimer = (sec) => {
   if (!MOBILE) return
-  const name = activeName()
+  const meta = getActiveWorkoutMeta()
+  const name = meta?.name || activeName()
   scheduleRestNotification(sec, { workoutName: name }).catch(() => {})
-  // The card carries the moment rest ends, not a countdown — see mobile.js for why.
-  updateOngoingWorkoutNotification({ name, restEndsAt: Date.now() + sec * 1000 }).catch(() => {})
+  syncWorkoutNotification(Date.now() + sec * 1000)
 }
 
-// `repost` is false while a rest is being replaced by another one: startRest calls stopRest
-// first, and rewriting the card back to "workout in progress" only to overwrite it a tick
-// later makes the shade flicker for no reason.
 const cancelPushRestTimer = (repost = true) => {
   if (!MOBILE) return
   cancelRestNotification().catch(() => {})
   if (!repost) return
-  const name = activeName()
-  if (name) updateOngoingWorkoutNotification({ name }).catch(() => {})
-  else clearOngoingWorkoutNotification().catch(() => {})
+  syncWorkoutNotification(null)
 }
 
 let toastTm = null
@@ -55,10 +103,10 @@ export const useUI = create((set, get) => ({
     toastTm = setTimeout(() => set({ toastMsg: '' }), 2200)
   },
 
-  startRest(sec) {
+  startRest(sec, meta = {}) {
     get().stopRest({ repost: false })
     const endsAt = Date.now() + sec * 1000
-    set({ timer: { left: sec, total: sec, endsAt } })
+    set({ timer: { left: sec, total: sec, endsAt, ...meta } })
     pushRestTimer(sec)
     timerTick = () => {
       const tm = get().timer

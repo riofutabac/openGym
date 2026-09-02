@@ -143,4 +143,22 @@ describe('sync.js - Offline Mutation Queue & Sync Drainer', () => {
 
     expect(mockRepo.saveWorkout).toHaveBeenCalledTimes(1)
   })
+
+  it('tracks deleted workouts and drains deletions to the server', async () => {
+    sync.markWorkoutSynced('w1')
+    sync.markWorkoutDeleted('w1')
+
+    expect(sync.getDeletedIds().has('w1')).toBe(true)
+    expect(sync.getSyncedIds().has('w1')).toBe(false)
+
+    const mockRepo = {
+      deleteWorkout: vi.fn().mockResolvedValue(true),
+      saveWorkout: vi.fn().mockResolvedValue(true),
+    }
+
+    const res = await sync.drain('usr_1', [], mockRepo)
+    expect(mockRepo.deleteWorkout).toHaveBeenCalledWith('usr_1', 'w1')
+    expect(sync.getPendingDeleteIds().has('w1')).toBe(false)
+    expect(sync.getDeletedIds().has('w1')).toBe(true) // Tombstone preserved
+  })
 })

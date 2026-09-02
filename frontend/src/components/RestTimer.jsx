@@ -34,21 +34,22 @@ export default function RestTimer() {
       <Button size="sm" variant="primary" icon="check" onClick={finishWorkEarly}>{t('Done')}</Button>
     </div>
   )
-  // Three controls plus the clock don't fit one line on a phone — at 360px the bar is left
-  // with about 30px and stops saying anything. So the rest variant stacks: clock and bar
-  // read at a glance, controls get their own row. −15 and +15 sit together in number-line
-  // order; Skip is pushed to the far edge, away from the button you tap to buy more time.
+  // Rest timer: the clock and progress bar live in the workout header.
+  // The bottom bar has a single, full-width thumb-friendly button to jump to next set or end rest.
   return (
     <div id="timer" className="rest">
-      <div className="head">
-        <div className="t">{clock(timer.left)}</div>
-        <div className="bar"><i style={{ width: pct + '%' }} /></div>
-      </div>
-      <div className="acts">
-        <Button size="sm" icon="minus" onClick={() => addRest(-15)}>15s</Button>
-        <Button size="sm" icon="plus" onClick={() => addRest(15)}>15s</Button>
-        <Button size="sm" variant="primary" className="skip" onClick={stopRest}>{t('Skip')}</Button>
-      </div>
+      <Button
+        size="lg"
+        variant="primary"
+        className="skip"
+        style={{ width: '100%', minHeight: 48, fontSize: 16, fontWeight: 600 }}
+        icon={timer?.betweenExercises ? 'forward' : 'play'}
+        onClick={stopRest}
+      >
+        {timer?.betweenExercises
+          ? (timer.nextExName ? t('Start {0}', timer.nextExName) : t('Next exercise'))
+          : t('Ready / Next set')}
+      </Button>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useStore, hasData } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { auth } from '../lib/backend/index.js'
+import { mapAuthError } from '../lib/errors.js'
 import { t } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
 import { useState } from 'react'
@@ -15,17 +16,19 @@ function AppwriteAuth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.()
+    setError(null)
     const em = email.trim()
     const pw = password
     if (!em || !pw) {
-      useUI.getState().toast(t('Please enter email and password'))
+      setError(t('Please enter email and password'))
       return
     }
     if (isRegister && pw.length < 8) {
-      useUI.getState().toast(t('Password must be at least 8 characters'))
+      setError(t('Password must be at least 8 characters'))
       return
     }
 
@@ -49,17 +52,20 @@ function AppwriteAuth() {
         useUI.getState().toast(t('Welcome back, {0}', u.name))
       }
     } catch (err) {
-      useUI.getState().toast(err.message || (isRegister ? t('Registration failed') : t('Sign-in failed')))
+      const errKey = mapAuthError(err, isRegister)
+      setError(t(errKey))
     } finally {
       setBusy(false)
     }
   }
 
   const handleOAuth = async () => {
+    setError(null)
     try {
       await auth.loginWithOAuth(auth.oauthProviderName?.toLowerCase() || 'google')
     } catch (err) {
-      useUI.getState().toast(err.message || t('OAuth failed'))
+      const errKey = mapAuthError(err, false)
+      setError(t(errKey))
     }
   }
 
@@ -84,6 +90,11 @@ function AppwriteAuth() {
           <label className="dim small" style={{ display: 'block', marginBottom: 4 }}>{t('Password')}</label>
           <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
         </div>
+        {error && (
+          <div className="card small" style={{ color: 'var(--red)', background: 'color-mix(in srgb, var(--red) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--red) 25%, transparent)', padding: '10px 12px', margin: '2px 0 4px', lineHeight: 1.4 }}>
+            {error}
+          </div>
+        )}
         <div style={{ height: 4 }} />
         <Button variant="primary" type="submit" disabled={busy}>
           {busy ? t('Connecting…') : isRegister ? t('Create account') : t('Sign in')}

@@ -13,7 +13,7 @@ export default function TabBar({ onStart }) {
   const isGuest = useStore(s => s.isGuest())
   if (!user && !isGuest) return null
   const cur = loc.pathname.split('/')[1] || 'home'
-  const on = k => cur === k || (cur === 'history' && k === 'stats') || (cur === 'settings' && k === 'home')
+  const on = k => cur === k || (cur === 'history' && k === 'stats')
 
   const startWorkout = () => {
     if (!S.active) {
@@ -28,16 +28,27 @@ export default function TabBar({ onStart }) {
     </button>
   )
 
+  if (S.active && cur === 'workout') return null
+
   return (
-    <nav id="tabbar">
-      <Tab k="home" icon="house" to="/home" label={t('Home')} />
-      <Tab k="plan" icon="calendar" to="/plan" label={t('Plan')} />
-      <button className={'start' + (S.active ? ' rec' : '')} onClick={startWorkout}>
-        <span className="cir"><Icon name={S.active ? 'play' : 'dumbbell'} /></span>
-        <span>{S.active ? t('Resume') : t('Start')}</span>
-      </button>
-      <Tab k="stats" icon="chart" to="/stats" label={t('Stats')} />
-      <Tab k="library" icon="list" to="/library" label={t('Exercises')} />
-    </nav>
+    <>
+      {S.active && cur !== 'workout' && (
+        <div className="workout-resume-banner" onClick={() => nav('/workout')}>
+          <span className="dot-rec" />
+          <span className="grow"><b>{t('Workout in progress')}</b> · {S.active.name}</span>
+          <span className="ret-badge">{t('Return to workout')} <Icon name="chevronRight" /></span>
+        </div>
+      )}
+      <nav id="tabbar">
+        <Tab k="home" icon="house" to="/home" label={t('Home')} />
+        <Tab k="plan" icon="repeat" to="/plan" label={t('Routines')} />
+        <button className={'start' + (S.active ? ' rec' : '')} onClick={startWorkout}>
+          <span className="cir"><Icon name={S.active ? 'play' : 'dumbbell'} /></span>
+          <span>{S.active ? t('Resume') : t('Start')}</span>
+        </button>
+        <Tab k="stats" icon="chart" to="/stats" label={t('Stats')} />
+        <Tab k="library" icon="list" to="/library" label={t('Exercises')} />
+      </nav>
+    </>
   )
 }

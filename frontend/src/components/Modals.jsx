@@ -45,6 +45,13 @@ function Sheet({ sheet }) {
   }, [])
 
   const close = () => closeSheet(sheet.id)
+  if (sheet.kind === 'fullscreen') {
+    return (
+      <div className="sheet-fullscreen" ref={ref}>
+        {sheet.render(close)}
+      </div>
+    )
+  }
   if (sheet.kind === 'center') {
     return (
       <div>
