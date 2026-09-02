@@ -19,6 +19,7 @@ import RestTimer from './components/RestTimer.jsx'
 import Login from './views/Login.jsx'
 import Home from './views/Home.jsx'
 import Plan from './views/Plan.jsx'
+import SplitEdit from './views/SplitEdit.jsx'
 import RoutineEdit from './views/RoutineEdit.jsx'
 import Workout from './views/Workout.jsx'
 import Stats from './views/Stats.jsx'
@@ -39,7 +40,7 @@ function applyPrefs(theme, accent) {
 function Shell() {
   const navigate = useNavigate()
   const loc = useLocation()
-  const { S, user, ready } = useStore()
+  const { S, user, ready, profilePulled } = useStore()
   const isGuest = useStore(s => s.isGuest())
   const langV = useLang()   // re-renders the whole shell when the language (pack) changes
   useEffect(() => { setNav(navigate) }, [navigate])
@@ -97,10 +98,14 @@ function Shell() {
   const authed = user || isGuest
 
   useEffect(() => {
-    if (ready && authed && needsOnboarding(S)) {
+    // profilePulled guards against the pre-pull moment right after login: setUser()
+    // flips `authed` before pullState() has merged the remote profile in, so a
+    // returning user's stale local S (no data yet) briefly looks brand-new and would
+    // otherwise re-trigger onboarding on every login.
+    if (ready && authed && profilePulled && needsOnboarding(S)) {
       onboardingSheet()
     }
-  }, [ready, authed])
+  }, [ready, authed, profilePulled, S])
 
   if (!ready && !authed) return (
     <div id="app">
@@ -120,6 +125,8 @@ function Shell() {
             <Routes>
               <Route path="/home" element={<Home />} />
               <Route path="/plan" element={<Plan />} />
+              <Route path="/splits/:id" element={<SplitEdit />} />
+              <Route path="/plan/split/:id" element={<SplitEdit />} />
               <Route path="/plan/r/:id" element={<RoutineEdit />} />
               <Route path="/workout" element={<Workout />} />
               <Route path="/stats" element={<Stats />} />

@@ -49,6 +49,14 @@ export function mapAuthError(err, isRegister = false) {
     return 'Network error — please check your internet connection'
   }
 
+  if (
+    type === 'user_count_exceeded' ||
+    msg.includes('exceeded the maximum number of users') ||
+    msg.includes('user limit')
+  ) {
+    return 'The project has reached its user registration limit in Appwrite console'
+  }
+
   return isRegister
     ? 'Registration failed. Please try again.'
     : 'Sign-in failed. Please check your credentials.'

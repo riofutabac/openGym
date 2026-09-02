@@ -6,7 +6,12 @@ import { t } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
 import { useState } from 'react'
 import Icon from '../components/Icon.jsx'
-import { Button } from '../components/ui.jsx'
+import { Button, Segmented, TextField } from '../components/ui.jsx'
+
+// DIRECTION: the app's own bottom-sheet grammar (rising bg-el panel, rounded
+// top, one entrance beat) rises over a hero that states the real product
+// fact — one online moment, then offline for good — instead of a generic
+// logo-and-tagline card. Same tokens/components as the rest of openGym.
 
 // Appwrite email/password + OAuth authentication view
 function AppwriteAuth() {
@@ -52,8 +57,10 @@ function AppwriteAuth() {
         useUI.getState().toast(t('Welcome back, {0}', u.name))
       }
     } catch (err) {
+      console.error('[Login.jsx handleSubmit error]', err)
       const errKey = mapAuthError(err, isRegister)
-      setError(t(errKey))
+      const translated = t(errKey)
+      setError(translated || err?.message || t('Registration failed. Please try again.'))
     } finally {
       setBusy(false)
     }
@@ -74,88 +81,97 @@ function AppwriteAuth() {
     : t('Continue with Google')
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'left' }}>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <>
+      <Segmented
+        className="auth-seg"
+        value={isRegister ? 'register' : 'login'}
+        onChange={v => { setIsRegister(v === 'register'); setError(null) }}
+        options={[
+          { value: 'login', label: t('Sign in') },
+          { value: 'register', label: t('Create account') },
+        ]}
+      />
+
+      <form onSubmit={handleSubmit} className="auth-form">
         {isRegister && (
-          <div>
-            <label className="dim small" style={{ display: 'block', marginBottom: 4 }}>{t('Your name')}</label>
-            <input className="input" placeholder="Alex" value={name} onChange={e => setName(e.target.value)} maxLength={50} />
+          <div className="auth-field">
+            <label className="dim small">{t('Your name')}</label>
+            <TextField placeholder={t('Your name')} value={name} onChange={e => setName(e.target.value)} maxLength={50} />
           </div>
         )}
-        <div>
-          <label className="dim small" style={{ display: 'block', marginBottom: 4 }}>{t('Email')}</label>
-          <input className="input" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
+        <div className="auth-field">
+          <label className="dim small">{t('Email')}</label>
+          <TextField type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
         </div>
-        <div>
-          <label className="dim small" style={{ display: 'block', marginBottom: 4 }}>{t('Password')}</label>
-          <input className="input" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+        <div className="auth-field">
+          <label className="dim small">
+            {t('Password')} {isRegister && <span style={{ opacity: 0.7 }}>({t('min. 8 characters')})</span>}
+          </label>
+          <TextField type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required minLength={isRegister ? 8 : 1} />
         </div>
-        {error && (
-          <div className="card small" style={{ color: 'var(--red)', background: 'color-mix(in srgb, var(--red) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--red) 25%, transparent)', padding: '10px 12px', margin: '2px 0 4px', lineHeight: 1.4 }}>
-            {error}
-          </div>
-        )}
-        <div style={{ height: 4 }} />
-        <Button variant="primary" type="submit" disabled={busy}>
+
+        {error && <div className="auth-error">{error}</div>}
+
+        <Button variant="primary" type="submit" disabled={busy} className="auth-cta">
           {busy ? t('Connecting…') : isRegister ? t('Create account') : t('Sign in')}
         </Button>
       </form>
 
       {auth.supportsOAuth && (
         <>
-          <div className="dim small" style={{ textAlign: 'center', margin: '4px 0' }}>{t('or')}</div>
+          <div className="auth-or">{t('or')}</div>
           <Button variant="outline" onClick={handleOAuth} disabled={busy}>
             {oauthLabel}
           </Button>
         </>
       )}
 
-      <div style={{ textAlign: 'center', marginTop: 10 }}>
-        <button
-          type="button"
-          className="btnlink small"
-          style={{ color: 'var(--acc)', background: 'none', border: 'none', cursor: 'pointer', padding: 6 }}
-          onClick={() => setIsRegister(!isRegister)}
-        >
-          {isRegister ? t('Already have an account? Sign in') : t('New to openGym? Create an account')}
-        </button>
-      </div>
-
-      <div className="card small muted" style={{ marginTop: 14, textAlign: 'left', lineHeight: 1.5 }}>
+      <div className="auth-note">
         {t('An internet connection is required once to create or sign into your account. After that, openGym works completely offline.')}
       </div>
-    </div>
+    </>
   )
 }
 
 export default function Login() {
   const { setGuest } = useStore()
-  const head = <>
-    <div style={{ fontSize: 54, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="dumbbell" /></div>
-    <h1 style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-.028em', margin: '10px 0 4px' }}>openGym</h1>
-  </>
-  const wrap = { display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '78vh', textAlign: 'center' }
+
+  const mark = (
+    <div className="auth-mark">
+      <Icon name="dumbbell" />
+      <span>openGym</span>
+    </div>
+  )
 
   // Demo build: no backend to sign in against — the only way in is the local guest profile.
   if (DEMO) return (
-    <div className="narrow" style={wrap}>
-      {head}
-      <div className="muted" style={{ marginBottom: 30 }}>{t('Live demo — everything stays in this browser.')}</div>
-      <Button variant="primary" icon="sparkles" onClick={() => setGuest(true)}>{t('Start the demo')}</Button>
-      <div className="card small muted" style={{ textAlign: 'left', marginTop: 16 }}>
-        {t('This demo runs entirely in your browser on example data — nothing is sent anywhere. Sign-in and sync across your devices come with the openGym server or Appwrite backend.')}
+    <div className="auth-shell">
+      <div className="auth-hero">
+        {mark}
+        <h1 className="auth-claim">{t('See it running')} <span className="accent">{t('right now.')}</span></h1>
       </div>
-      <div className="dim small" style={{ marginTop: 22, lineHeight: 1.6 }}>
-        <a href={REPO} target="_blank" rel="noopener">{t('Self-host it in a minute →')}</a>
+      <div className="auth-panel">
+        <div className="auth-note" style={{ marginTop: 0, marginBottom: 4 }}>{t('Live demo — everything stays in this browser.')}</div>
+        <Button variant="primary" icon="sparkles" onClick={() => setGuest(true)} className="auth-cta">
+          {t('Start the demo')}
+        </Button>
+        <div className="auth-note">
+          {t('This demo runs entirely in your browser on example data — nothing is sent anywhere. Sign-in and sync across your devices come with the openGym server or Appwrite backend.')}
+        </div>
+        <a href={REPO} target="_blank" rel="noopener" className="auth-selfhost">{t('Self-host it in a minute →')}</a>
       </div>
     </div>
   )
 
   return (
-    <div className="narrow" style={wrap}>
-      {head}
-      <div className="muted" style={{ marginBottom: 24 }}>{t('Your workouts. Your weights. Your account.')}</div>
-      <AppwriteAuth />
+    <div className="auth-shell">
+      <div className="auth-hero">
+        {mark}
+        <h1 className="auth-claim">{t('Sign in once.')} <span className="accent">{t('Train offline, always.')}</span></h1>
+      </div>
+      <div className="auth-panel">
+        <AppwriteAuth />
+      </div>
     </div>
   )
 }

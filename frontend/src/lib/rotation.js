@@ -48,10 +48,21 @@ export function nextRoutine(S) {
   return chosen
 }
 
+export function activeSplit(S) {
+  if (!S) return null
+  const splits = S.splits || []
+  if (!splits.length) return null
+  return splits.find(sp => sp.id === S.activeSplitId) || splits[0] || null
+}
+
+export function activeWeek(S) {
+  return activeSplit(S)?.week || S?.week || {}
+}
+
 export function seedRotationFromWeek(S) {
   const routines = S?.routines || []
   if (!routines.length) return []
-  const week = S?.week || {}
+  const week = activeWeek(S)
   const seen = new Set()
   const ordered = []
 

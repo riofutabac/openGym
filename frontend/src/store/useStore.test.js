@@ -22,6 +22,7 @@ describe('useStore boot() and lifecycle', () => {
       S: JSON.parse(JSON.stringify(DEF)),
       user: null,
       ready: false,
+      profilePulled: false,
     })
     useStore.getState().setGuest(false)
   })
@@ -72,6 +73,32 @@ describe('useStore boot() and lifecycle', () => {
 
       expect(useStore.getState().user).toEqual({ id: 'usr_real', name: 'Real User', email: 'real@example.com' })
       expect(useStore.getState().isGuest()).toBe(false)
+    })
+  })
+
+  describe('profilePulled gates the onboarding check across a login', () => {
+    it('setUser(u) clears profilePulled, and pullState() sets it back once the remote profile has merged', async () => {
+      vi.spyOn(stateRepo, 'loadProfile').mockResolvedValue({
+        ts: 100,
+        settings: { onboarded: true },
+        routines: [{ id: 'r1', name: 'Push', ex: [] }],
+        bodyweight: [{ d: '2026-01-01', w: 80, t: 1 }],
+      })
+      vi.spyOn(stateRepo, 'listWorkouts').mockResolvedValue([])
+      Object.assign(stateRepo, { supportsPerSessionRows: true })
+
+      expect(useStore.getState().profilePulled).toBe(false)
+
+      // Mirrors Login.jsx: setUser() fires first, flipping `authed` before the
+      // remote profile has actually merged in.
+      useStore.getState().setUser({ id: 'u_returning', name: 'Returning User' })
+      expect(useStore.getState().profilePulled).toBe(false)
+
+      await useStore.getState().pullState()
+
+      expect(useStore.getState().profilePulled).toBe(true)
+      expect(useStore.getState().S.onboarded).toBe(true)
+      expect(useStore.getState().S.routines).toHaveLength(1)
     })
   })
 

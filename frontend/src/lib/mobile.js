@@ -12,6 +12,7 @@
 // pass it into Promise.resolve(), to avoid the "LocalNotifications.then() is not implemented on android" trap.
 import { registerPlugin } from '@capacitor/core'
 import { t } from './i18n.js'
+import { activeWeek } from './rotation.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
 export const WorkoutNotification = registerPlugin('WorkoutNotification')
@@ -143,7 +144,7 @@ export async function syncReminder(S, interactive = false, options = {}) {
     if (perm.display !== 'granted' && interactive) perm = await LocalNotifications.requestPermissions()
     if (perm.display !== 'granted') return false
     const [hour, minute] = (r.time || '08:00').split(':').map(Number)
-    const notifications = Object.entries(S.week || {})
+    const notifications = Object.entries(activeWeek(S) || {})
       .filter(([, rid]) => rid && (S.routines || []).some(x => x.id === rid))
       .map(([day, rid]) => ({
         id: 100 + Number(day),

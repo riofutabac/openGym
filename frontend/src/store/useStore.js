@@ -1,29 +1,73 @@
 import { create } from 'zustand'
 import { auth, state as stateRepo } from '../lib/backend/index.js'
-import { localTZ } from '../lib/format.js'
+import { localTZ, uid } from '../lib/format.js'
 import { registerCustom } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { MOBILE, syncReminder, updateOngoingWorkoutNotification, clearOngoingWorkoutNotification } from '../lib/mobile.js'
 import { syncQueue } from './sync.js'
 import { onReconnect } from '../lib/net.js'
+import { t } from '../lib/i18n.js'
 
 const KEY = 'gym_state_v1'
 export const DEF = {
-  unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'en',
+  unit: 'kg', restSec: 90, sound: true, keepAwake: true, lang: 'es',
   theme: 'dark', accent: 'lime', body: 'male', targetW: null,
-  bodyweight: [], routines: [], week: {}, dayPlan: {},
+  bodyweight: [], routines: [], splits: [], activeSplitId: null, week: {}, dayPlan: {},
   exWeights: {}, workouts: [], active: null, customEx: [], gifSize: 'full',
   reminder: { on: false, time: '08:00', tz: null }, effort: null,
-  wifiOnlyMedia: true,
+  wifiOnlyMedia: true, onboarded: false,
 }
 const clone = o => JSON.parse(JSON.stringify(o))
+
+export function migrateSplits(s) {
+  if (!s) return
+  s.splits = Array.isArray(s.splits) ? s.splits : []
+  s.routines = Array.isArray(s.routines) ? s.routines : []
+
+  // This runs after every update() call, not just on load — so the fallback below must
+  // only fire for a genuine legacy migration (an old root `week` schedule to carry over).
+  // Falling back on "you still have routines" too would resurrect an empty split right
+  // after the user explicitly deletes their last one.
+  if (s.splits.length === 0) {
+    const hasWeekDays = s.week && Object.keys(s.week).some(k => s.week[k])
+    if (hasWeekDays) {
+      const defaultSplit = {
+        id: uid(),
+        name: 'Mi Split',
+        emoji: '💪',
+        week: { ...s.week }
+      }
+      s.splits.push(defaultSplit)
+      s.activeSplitId = defaultSplit.id
+    }
+  }
+
+  if (s.splits.length > 0) {
+    const valid = s.splits.some(sp => sp.id === s.activeSplitId)
+    if (!valid) {
+      s.activeSplitId = s.splits[0].id
+    }
+    const curSplit = s.splits.find(sp => sp.id === s.activeSplitId)
+    if (curSplit) {
+      s.week = { ...curSplit.week }
+    }
+  } else {
+    s.activeSplitId = null
+  }
+}
 
 function loadState() {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return Object.assign(clone(DEF), JSON.parse(raw))
+    if (raw) {
+      const st = Object.assign(clone(DEF), JSON.parse(raw))
+      migrateSplits(st)
+      return st
+    }
   } catch (e) { /* ignore */ }
-  return clone(DEF)
+  const st = clone(DEF)
+  migrateSplits(st)
+  return st
 }
 
 const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length)
@@ -92,6 +136,11 @@ export const useStore = create((set, get) => {
     S: initialS,
     user: (() => { try { return JSON.parse(localStorage.getItem('gym_user')) || null } catch { return null } })(),
     ready: false,
+    // False right after login, until pullState() has merged the remote profile — the
+    // App-level onboarding check must wait for this, or a returning user's stale
+    // pre-pull S (no data yet) looks exactly like a brand-new account and re-triggers
+    // "set your starting weight" on every single login.
+    profilePulled: false,
     isSyncing: false,
     pendingCount: syncQueue.getPendingCount(initialS.workouts),
     failedWorkouts: syncQueue.getFailedWorkouts(),
@@ -101,11 +150,50 @@ export const useStore = create((set, get) => {
       const S = clone(get().S)
       S._ts = Date.now()
       mut(S)
+      migrateSplits(S)
       persist(S, push)
     },
     replaceState(S, push = false) {
-      S._ts = S._ts || Date.now()
-      persist(clone(S), push)
+      const next = clone(S)
+      migrateSplits(next)
+      next._ts = next._ts || Date.now()
+      persist(next, push)
+    },
+
+    createSplit(opts = {}) {
+      const split = {
+        id: uid(),
+        name: (opts.name || t('New split')).trim(),
+        emoji: opts.emoji || '💪',
+        week: opts.week || {}
+      }
+      get().update(s => {
+        s.splits = s.splits || []
+        s.splits.push(split)
+        s.activeSplitId = split.id
+        s.week = { ...split.week }
+      })
+      return split
+    },
+
+    setActiveSplit(id) {
+      get().update(s => {
+        if ((s.splits || []).some(sp => sp.id === id)) {
+          s.activeSplitId = id
+          const curSplit = s.splits.find(sp => sp.id === id)
+          if (curSplit) s.week = { ...curSplit.week }
+        }
+      })
+    },
+
+    deleteSplit(id) {
+      get().update(s => {
+        s.splits = (s.splits || []).filter(sp => sp.id !== id)
+        if (s.activeSplitId === id) {
+          s.activeSplitId = s.splits.length ? s.splits[0].id : null
+          s.week = s.splits.length ? { ...s.splits[0].week } : {}
+        }
+      })
     },
 
     isGuest: () => localStorage.getItem('gym_guest') === '1',
@@ -114,7 +202,7 @@ export const useStore = create((set, get) => {
     setUser(u) {
       if (u) { localStorage.setItem('gym_user', JSON.stringify(u)); localStorage.removeItem('gym_guest') }
       else localStorage.removeItem('gym_user')
-      set({ user: u })
+      set({ user: u, profilePulled: false })
     },
 
     async deleteWorkout(id) {
@@ -202,20 +290,25 @@ export const useStore = create((set, get) => {
             next._ts = remoteProf.ts
             Object.assign(next, remoteProf.settings || {})
             next.routines = remoteProf.routines || []
+            next.splits = remoteProf.splits || []
+            next.activeSplitId = remoteProf.activeSplitId || null
             next.week = remoteProf.week || {}
             next.dayPlan = remoteProf.dayPlan || {}
             next.exWeights = remoteProf.exWeights || {}
             next.customEx = remoteProf.customEx || []
             next.bodyweight = remoteProf.bodyweight || []
+            migrateSplits(next)
             syncQueue.setProfileDirty(false)
           } else if (hasData(S)) {
             // Local profile is newer or dirty: push to remote
-            const { routines, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S
+            const { routines, splits, activeSplitId, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S
             try {
               await stateRepo.saveProfile(user.id, {
                 ts: _ts || Date.now(),
                 settings,
                 routines: routines || [],
+                splits: splits || [],
+                activeSplitId: activeSplitId || null,
                 week: week || {},
                 dayPlan: dayPlan || {},
                 exWeights: exWeights || {},
@@ -280,6 +373,7 @@ export const useStore = create((set, get) => {
         set({
           pendingCount: syncQueue.getPendingCount(get().S.workouts),
           failedWorkouts: syncQueue.getFailedWorkouts(),
+          profilePulled: true,
         })
       }
     },

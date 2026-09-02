@@ -1,101 +1,107 @@
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
-import { uid, exCount, DAYS } from '../lib/format.js'
+import { DAYS } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
-import { loadStarterPlan, planToolsSheet } from '../sheets.jsx'
+import { loadStarterPlan, openTemplatesSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
-import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
-import { nextRoutine, daysSinceDone } from '../lib/rotation.js'
+import { glyphOf } from '../lib/glyphs.js'
+import { activeSplit } from '../lib/rotation.js'
+
+const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun
 
 export default function Plan() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
-  const update = useStore(s => s.update)
+  const createSplit = useStore(s => s.createSplit)
+  const setActiveSplit = useStore(s => s.setActiveSplit)
 
-  const addRoutine = () => {
-    const r = { id: uid(), name: t('New routine'), emoji: DEFAULT_GLYPH, ex: [] }
-    update(s => { s.routines.push(r) })
-    nav('/plan/r/' + r.id)
+  const splits = S.splits || []
+  const active = activeSplit(S)
+
+  const handleCreateSplit = () => {
+    const sp = createSplit({ name: t('New split'), emoji: '💪' })
+    nav('/splits/' + sp.id)
   }
-
-  const next = nextRoutine(S)
 
   return (
     <div className="narrow">
       <div className="hdr">
         <div>
-          <h1>{t('Routines')}</h1>
-          <div className="sub">{t('Continuous rotation cycle')}</div>
+          <h1>{t('Splits')}</h1>
+          <div className="sub">{t('Your weekly training schedules')}</div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <Button size="sm" variant="tinted" icon="plus" onClick={addRoutine}>{t('New')}</Button>
-          <button className="iconbtn" onClick={planToolsSheet} aria-label={t('Share your plan')} title={t('Share your plan')}><Icon name="upload" /></button>
+          <Button size="sm" variant="ghost" icon="sparkles" onClick={openTemplatesSheet}>
+            {t('Plantillas')}
+          </Button>
+          <Button size="sm" variant="tinted" icon="plus" onClick={handleCreateSplit}>
+            {t('New')}
+          </Button>
         </div>
       </div>
 
-      {S.routines.length ? (
-        <>
-          <div className="list">
-            {S.routines.map((r, idx) => {
-              const isNext = next && next.id === r.id
-              const days = daysSinceDone(S, r.id)
-              const lastDoneLabel = days == null
-                ? t('Never performed')
-                : days === 0
-                  ? t('done today')
-                  : days === 1
-                    ? t('Last done yesterday')
-                    : t('Last done {0} days ago', days)
-
-              const assignedDays = Object.entries(S.week || {})
-                .filter(([, rid]) => rid === r.id)
-                .map(([d]) => Number(d))
-                .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
-
-              const daysStr = assignedDays.length > 0
-                ? assignedDays.map(d => t(DAYS[d])).join(', ')
-                : null
-
-              return (
-                <div key={r.id} className={'item' + (isNext ? ' highlighted' : '')} onClick={() => nav('/plan/r/' + r.id)} style={{ cursor: 'pointer' }}>
-                  <span className="lrow-i" style={{ background: isNext ? 'var(--acc)' : undefined, color: isNext ? 'var(--acc-fg)' : undefined }}>
-                    <Icon name={glyphOf(r.emoji)} />
-                  </span>
-                  <div className="grow">
-                    <div className="row" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div className="tt" style={{ fontWeight: isNext ? 600 : 500 }}>{r.name}</div>
-                      {daysStr && <span className="tag" style={{ fontSize: 11, padding: '2px 6px', background: 'var(--surface-3)', color: 'var(--label)' }}>{daysStr}</span>}
-                      {isNext && <span className="tag acc" style={{ fontSize: 11, padding: '2px 6px' }}>{t('Up next')}</span>}
-                    </div>
-                    <div className="ss">{exCount(r.ex.length)} · {daysStr ? t('Every {0}', daysStr) : lastDoneLabel}</div>
-                  </div>
-                  <Icon name="chevronRight" className="chev" />
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="card small muted" style={{ marginTop: 16, lineHeight: 1.5, background: 'var(--surface-1)' }}>
-            <div className="row" style={{ gap: 8, marginBottom: 4, color: 'var(--fg)', fontWeight: 500 }}>
-              <Icon name="repeat" style={{ color: 'var(--acc)' }} />
-              <span>{t('How rotation works')}</span>
-            </div>
-            {t('Routines rotate in a continuous cycle: when you finish one, openGym suggests the next.')}
-          </div>
-        </>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '24px 0' }}>
+      {splits.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
           <div className="empty">
-            <div className="ico"><Icon name="repeat" /></div>
-            <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 6 }}>{t('No routines yet')}</div>
-            <div className="dim small" style={{ maxWidth: 320, margin: '0 auto 18px', lineHeight: 1.5 }}>
-              {t('Routines rotate in a continuous cycle: when you finish one, openGym suggests the next.')}
+            <div className="ico"><Icon name="calendar" /></div>
+            <div style={{ fontWeight: 600, fontSize: 18, marginBottom: 6 }}>{t('No training plan yet')}</div>
+            <div className="dim small" style={{ maxWidth: 320, margin: '0 auto 20px', lineHeight: 1.5 }}>
+              {t('Set up a split to organize your weekly training schedule and reuse routines.')}
             </div>
           </div>
-          <Button variant="primary" icon="sparkles" onClick={loadStarterPlan}>{t('Load starter plan (Upper / Lower 4 days)')}</Button>
+          <Button variant="primary" icon="sparkles" onClick={openTemplatesSheet}>
+            {t('Plantillas de entrenamiento')}
+          </Button>
           <div style={{ height: 10 }} />
-          <Button variant="ghost" icon="plus" onClick={addRoutine}>{t('Create custom routine')}</Button>
+          <Button variant="ghost" icon="plus" onClick={handleCreateSplit}>
+            {t('Create custom split')}
+          </Button>
+        </div>
+      ) : (
+        <div className="list" style={{ gap: 8 }}>
+          {splits.map(sp => {
+            const isActive = active?.id === sp.id
+            const scheduledDays = WEEK_DAYS.filter(d => sp.week?.[d])
+            const daysStr = scheduledDays.length
+              ? scheduledDays.map(d => t(DAYS[d]).slice(0, 3)).join(', ')
+              : t('No scheduled days')
+
+            return (
+              <div
+                key={sp.id}
+                className="item"
+                onClick={() => nav('/splits/' + sp.id)}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 14px',
+                  border: isActive ? '1px solid color-mix(in srgb, var(--acc) 30%, transparent)' : undefined,
+                  background: isActive ? 'color-mix(in srgb, var(--acc) 5%, var(--surface))' : undefined,
+                }}
+              >
+                <span className="lrow-i" style={{ background: isActive ? 'var(--acc)' : undefined, color: isActive ? 'var(--acc-fg)' : undefined }}>
+                  <Icon name={glyphOf(sp.emoji || '💪')} />
+                </span>
+                <div className="grow">
+                  <div className="row" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="tt" style={{ fontWeight: isActive ? 600 : 500 }}>{sp.name}</div>
+                    {isActive && <span className="tag acc" style={{ fontSize: 11, padding: '2px 6px' }}>{t('Active')}</span>}
+                  </div>
+                  <div className="ss">{scheduledDays.length} {t('days/week')} · {daysStr}</div>
+                </div>
+                {!isActive && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={e => { e.stopPropagation(); setActiveSplit(sp.id) }}
+                  >
+                    {t('Activate')}
+                  </Button>
+                )}
+                <Icon name="chevronRight" className="chev" />
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

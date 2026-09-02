@@ -150,4 +150,40 @@ describe('Appwrite State Repository', () => {
       expect(bobWorkouts[0].id).toBe('w_bob_1')
     })
   })
+
+  describe('Profile Splits Persistence', () => {
+    it('round-trips splits and activeSplitId through dedicated columns, not the settings blob', async () => {
+      const repo = createAppwriteStateRepo({ databases: mockDatabases, sdk: mockSDK, auth: mockAuth })
+
+      const sampleState = {
+        _ts: 1,
+        unit: 'kg',
+        routines: [{ id: 'r_upper', name: 'Upper', ex: [] }],
+        splits: [{ id: 'sp1', name: 'Upper/Lower', emoji: '💪', week: { 1: 'r_upper' } }],
+        activeSplitId: 'sp1',
+        week: {},
+        dayPlan: {},
+        workouts: [],
+      }
+
+      await repo.save(sampleState)
+      const loaded = await repo.load()
+
+      expect(loaded.splits).toEqual(sampleState.splits)
+      expect(loaded.activeSplitId).toBe('sp1')
+
+      // Confirm splits live in their own column, not smuggled inside settings.
+      const doc = await mockDatabases.getDocument(DATABASE_ID, TABLES.PROFILES, 'u_test_1')
+      expect(doc.splits).toBe(JSON.stringify(sampleState.splits))
+      expect(JSON.parse(doc.settings).splits).toBeUndefined()
+    })
+
+    it('defaults activeSplitId to null and splits to [] when nothing was saved yet', async () => {
+      const repo = createAppwriteStateRepo({ databases: mockDatabases, sdk: mockSDK, auth: mockAuth })
+      await repo.save({ _ts: 1, unit: 'kg', routines: [], week: {}, dayPlan: {}, workouts: [] })
+      const loaded = await repo.load()
+      expect(loaded.splits).toEqual([])
+      expect(loaded.activeSplitId).toBeNull()
+    })
+  })
 })

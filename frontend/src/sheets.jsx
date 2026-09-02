@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI, syncWorkoutNotification, stopWorkoutHeartbeat } from './store/useUI.js'
 import { EXDB, EXIDX, BODYPARTS, isCardio, isBodyweightEq, allExercises, equipmentOf } from './lib/exercises.js'
-import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, uid, exCount, DAYN, MONTHS_LONG, ACCENTS } from './lib/format.js'
+import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, uid, exCount, DAYN, DAYS, MONTHS_LONG, ACCENTS } from './lib/format.js'
 import { lastEntryFor, bestWeightFor, buildSets, effectiveRoutineId, effectiveRestSec, workoutVolume, setsDone, setsDoneActive, lastBW, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps, isTimed } from './lib/history.js'
 import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
-import { starterRoutines } from './lib/starter.js'
+import { starterRoutines, TEMPLATES, instantiateTemplate } from './lib/starter.js'
 import Media, { Thumb } from './components/Media.jsx'
 import Stepper from './components/Stepper.jsx'
 import Icon from './components/Icon.jsx'
@@ -44,15 +44,301 @@ export function confirmSheet(opts) {
   ui().openSheet(close => <ConfirmDialog {...opts} close={close} />, { kind: 'center' })
 }
 
-/* ============================ starter plan ============================ */
-export function loadStarterPlan() {
-  const [torsoA, piernaA, torsoB, piernaB] = starterRoutines()
+/* ============================ starter plan & templates ============================ */
+export function openTemplatesSheet() {
+  ui().openSheet(close => <TemplatesSheet close={close} />)
+}
+
+export function loadStarterPlan(templateId = 'upper-lower') {
+  const { routines, split, template } = instantiateTemplate(templateId)
   update(st => {
-    st.routines = [torsoA, piernaA, torsoB, piernaB]
-    st.week = { 1: torsoA.id, 2: piernaA.id, 4: torsoB.id, 5: piernaB.id }
+    st.routines = routines
+    st.splits = [split]
+    st.activeSplitId = split.id
+    st.week = { ...split.week }
     st.dayPlan = {}
   })
-  toast(t('Plan Upper/Lower 4 días cargado'))
+  toast(`${template.name} ${t('cargado con éxito')}`)
+}
+
+function TemplatesSheet({ close }) {
+  const [selectedId, setSelectedId] = useState('upper-lower')
+  const [expandedRoutineIdx, setExpandedRoutineIdx] = useState(null)
+  const tabListRef = useRef(null)
+  const curTpl = TEMPLATES.find(t => t.id === selectedId) || TEMPLATES[0]
+
+  const handleSelect = (id) => {
+    setSelectedId(id)
+    setExpandedRoutineIdx(null)
+  }
+
+  const handleApply = () => {
+    const { routines, split, template } = instantiateTemplate(curTpl.id)
+    confirmSheet({
+      title: `${t('Cargar')} ${template.name}`,
+      message: t('¿Deseas cargar este programa? Se configurará el horario semanal y las rutinas predeterminadas.'),
+      confirmText: t('Cargar programa'),
+      onConfirm: () => {
+        update(st => {
+          st.routines = routines
+          st.splits = [split]
+          st.activeSplitId = split.id
+          st.week = { ...split.week }
+          st.dayPlan = {}
+        })
+        toast(`${template.name} ${t('cargado con éxito')}`)
+        close()
+      }
+    })
+  }
+
+  const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 'calc(var(--sab, 0px) + 8px)' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--label)' }}>
+            {t('Programas de entrenamiento')}
+          </h3>
+          <div style={{ fontSize: 13, color: 'var(--label-2)', marginTop: 2 }}>
+            {t('100% Máquinas y poleas · Cero carga axial')}
+          </div>
+        </div>
+        <button
+          onClick={close}
+          aria-label={t('Close')}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: 'var(--surface-3)',
+            color: 'var(--label)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0
+          }}
+        >
+          <Icon name="x" size={16} />
+        </button>
+      </div>
+
+      {/* Horizontally Scrollable Program Tabs */}
+      <div
+        ref={tabListRef}
+        style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          padding: '2px 2px 6px',
+          margin: '0 -4px',
+          scrollbarWidth: 'none',
+          WebkitOverflowScrolling: 'touch'
+        }}
+      >
+        {TEMPLATES.map(tpl => {
+          const isSel = tpl.id === selectedId
+          const iconName = glyphOf(tpl.emoji) || 'dumbbell'
+          return (
+            <button
+              key={tpl.id}
+              onClick={() => handleSelect(tpl.id)}
+              style={{
+                flex: '0 0 auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '8px 14px',
+                borderRadius: 'var(--r-xl)',
+                fontSize: 13,
+                fontWeight: isSel ? 600 : 500,
+                background: isSel ? 'var(--acc)' : 'var(--surface-2)',
+                color: isSel ? 'var(--on-acc)' : 'var(--label-2)',
+                border: isSel ? '1px solid var(--acc)' : '1px solid var(--sep-op)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Icon name={iconName} size={15} />
+              {tpl.shortName || tpl.name}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Program Summary & Schedule Card */}
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 14, margin: 0 }}>
+        {/* Card Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <span
+            className="lrow-i"
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 'var(--r)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--surface-3)',
+              color: 'var(--acc)',
+              flexShrink: 0
+            }}
+          >
+            <Icon name={glyphOf(curTpl.emoji) || 'barbell'} size={22} />
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--label)' }}>
+              {curTpl.name}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <span className="badge" style={{ fontSize: 11, background: 'var(--surface-3)', color: 'var(--label)' }}>
+                {curTpl.daysCount} {t('días / sem')}
+              </span>
+              <span className="badge" style={{ fontSize: 11, background: 'var(--surface-3)', color: 'var(--label-2)' }}>
+                {t('Freq')} {curTpl.freq}
+              </span>
+              {curTpl.isDefault && (
+                <span className="badge" style={{ fontSize: 11, background: 'var(--acc-soft)', color: 'var(--acc)', fontWeight: 600 }}>
+                  {t('Recomendado')}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <p style={{ fontSize: 13, color: 'var(--label-2)', margin: 0, lineHeight: 1.45 }}>
+          {curTpl.description}
+        </p>
+
+        {/* Weekly Schedule Breakdown */}
+        <div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--label-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+            {t('Distribución semanal')}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {WEEK_DAYS.map(dayIdx => {
+              const rIdx = curTpl.week[dayIdx]
+              const hasRoutine = rIdx !== undefined && curTpl.routines[rIdx]
+              const r = hasRoutine ? curTpl.routines[rIdx] : null
+              const isExpanded = expandedRoutineIdx === rIdx
+
+              if (!hasRoutine) {
+                return (
+                  <div
+                    key={dayIdx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--r-sm)',
+                      background: 'transparent',
+                      border: '1px dashed var(--sep-op)',
+                      opacity: 0.5,
+                      fontSize: 13
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: 'var(--label-3)', width: 36, fontSize: 12 }}>
+                      {t(DAYN[dayIdx]).slice(0, 3)}
+                    </span>
+                    <span style={{ color: 'var(--label-3)', fontSize: 12.5 }}>{t('Descanso')}</span>
+                    <span style={{ width: 16 }} />
+                  </div>
+                )
+              }
+
+              return (
+                <div
+                  key={dayIdx}
+                  style={{
+                    borderRadius: 'var(--r-sm)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--sep-op)',
+                    overflow: 'hidden',
+                    transition: 'background var(--fast) var(--ease)'
+                  }}
+                >
+                  <div
+                    onClick={() => setExpandedRoutineIdx(isExpanded ? null : rIdx)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '9px 12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          color: 'var(--acc)',
+                          background: 'var(--acc-soft)',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          fontSize: 11.5,
+                          minWidth: 34,
+                          textAlign: 'center'
+                        }}
+                      >
+                        {t(DAYN[dayIdx]).slice(0, 3)}
+                      </span>
+                      <span style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--label)' }}>{r[0]}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11.5, color: 'var(--label-3)' }}>
+                        {r[2].length} {t('ejercicios')}
+                      </span>
+                      <Icon name={isExpanded ? 'chevronUp' : 'chevronDown'} size={14} style={{ color: 'var(--label-3)' }} />
+                    </div>
+                  </div>
+
+                  {/* Expanded Exercise Preview */}
+                  {isExpanded && (
+                    <div style={{ padding: '4px 12px 10px 48px', display: 'flex', flexDirection: 'column', gap: 5, borderTop: '1px solid var(--sep-op)', background: 'var(--surface-3)' }}>
+                      <div style={{ height: 2 }} />
+                      {r[2].map(([exId, sets, reps, extra], i) => {
+                        const exData = EXIDX[exId]
+                        const exName = exData ? t(exData.n) : exId
+                        const rangeStr = extra?.repsMin && extra?.repsMax ? `${extra.repsMin}–${extra.repsMax}` : reps
+                        const restStr = extra?.restSec ? `${extra.restSec / 60} min` : '90s'
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--label-2)' }}>
+                            <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '68%' }}>
+                              {i + 1}. {exName}
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--label-3)', whiteSpace: 'nowrap' }}>
+                              {sets} × {rangeStr} · {restStr}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Apply Button */}
+      <Button
+        variant="primary"
+        icon="sparkles"
+        onClick={handleApply}
+        style={{ width: '100%', height: 48, fontSize: 16, fontWeight: 600, marginTop: 4 }}
+      >
+        {t('Cargar')} {curTpl.shortName || curTpl.name}
+      </Button>
+    </div>
+  )
 }
 
 /* ============================ weight picker (shared: body weight + goal) ============================ */
@@ -80,15 +366,34 @@ function WeightInput({ value, setValue, unit }) {
   }
   return <>
     <div className="bwstep">
-      <button className="bw-pm" onClick={() => step(-0.1)} aria-label="minus 0.1"><Icon name="minus" /></button>
-      <div className="bw-read">{cur != null ? fmtNum(cur) : '--'}<span className="u"> {unit}</span></div>
-      <button className="bw-pm" onClick={() => step(0.1)} aria-label="plus 0.1"><Icon name="plus" /></button>
+      <button type="button" className="bw-pm" onClick={() => step(-0.5)} aria-label="minus 0.5"><Icon name="minus" /></button>
+      <div className="bw-input-wrap">
+        <input
+          type="number"
+          inputMode="decimal"
+          step="0.1"
+          className="bw-direct-input"
+          placeholder={String(defaultBase)}
+          value={cur != null ? cur : ''}
+          onChange={e => {
+            const raw = e.target.value
+            if (raw === '') { setValue(null); return }
+            const n = parseFloat(raw)
+            if (!isNaN(n)) setValue(n)
+          }}
+          onBlur={() => {
+            if (cur != null) setValue(clamp(cur))
+          }}
+        />
+        <span className="u">{unit}</span>
+      </div>
+      <button type="button" className="bw-pm" onClick={() => step(0.5)} aria-label="plus 0.5"><Icon name="plus" /></button>
     </div>
-    <div className="chips" style={{ justifyContent: 'center', margin: '8px 0' }}>
-      <button className="chip" onClick={() => step(-1)}>−1</button>
-      <button className="chip" onClick={() => step(-0.5)}>−0.5</button>
-      <button className="chip" onClick={() => step(0.5)}>+0.5</button>
-      <button className="chip" onClick={() => step(1)}>+1</button>
+    <div className="chips" style={{ justifyContent: 'center', margin: '10px 0 12px' }}>
+      <button type="button" className="chip" onClick={() => step(-1)}>−1</button>
+      <button type="button" className="chip" onClick={() => step(-0.5)}>−0.5</button>
+      <button type="button" className="chip" onClick={() => step(0.5)}>+0.5</button>
+      <button type="button" className="chip" onClick={() => step(1)}>+1</button>
     </div>
     <Slider value={sv} min={W_LO} max={W_HI} step={0.5} onChange={onSlide} />
   </>
@@ -153,6 +458,16 @@ function OnboardingSheet({ close }) {
   const [goal, setGoal] = useState('maintain')
   const [weeklyTarget, setWeeklyTarget] = useState(3)
 
+  const skip = () => {
+    update(s => {
+      s.onboarded = true
+      if (!s.routines || s.routines.length === 0) {
+        s.routines = starterRoutines()
+      }
+    })
+    close()
+  }
+
   const finish = (finalGoal = goal, finalTarget = weeklyTarget) => {
     const n = weight != null ? Math.round(weight * 10) / 10 : null
     if (n == null || n <= 0) {
@@ -161,6 +476,7 @@ function OnboardingSheet({ close }) {
       return
     }
     update(s => {
+      s.onboarded = true
       Object.assign(s, applyOnboarding(s, {
         weight: n,
         unit,
@@ -225,6 +541,10 @@ function OnboardingSheet({ close }) {
             }}
           >
             {t('Continue')}
+          </Button>
+          <div style={{ height: 8 }} />
+          <Button variant="ghost" className="dim" size="sm" onClick={skip}>
+            {t('Skip for now')}
           </Button>
         </>
       )}
@@ -928,17 +1248,35 @@ export const glyphPicker = (current, onPick) => {
   </>)
 }
 
-/* ============================ share / print / import a plan ============================ */
-export const planToolsSheet = () => ui().openSheet(close => <PlanTools close={close} />)
+/* ============================ routine picker (for adding to a split) ============================ */
+export const routinePickerSheet = (routines, onPick) => ui().openSheet(close => <>
+  <h3>{t('Add a routine')}</h3>
+  {routines.length ? <div className="list" style={{ marginTop: 10 }}>
+    {routines.map(r => (
+      <div key={r.id} className="item" onClick={() => { close(); onPick(r.id) }} style={{ cursor: 'pointer' }}>
+        <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
+        <div className="grow">
+          <div className="tt">{r.name}</div>
+          <div className="ss">{exCount(r.ex.length)}</div>
+        </div>
+      </div>
+    ))}
+  </div> : <div className="empty" style={{ padding: '20px 0' }}><div className="dim small">{t('All your routines are already in this split.')}</div></div>}
+</>)
 
-function PlanTools({ close }) {
+/* ============================ share / print / import a plan ============================ */
+export const planToolsSheet = splitId => ui().openSheet(close => <PlanTools splitId={splitId} close={close} />)
+
+function PlanTools({ splitId, close }) {
   const st = useStore(s => s.S)
   const user = useStore(s => s.user)
   const fileRef = useRef(null)
-  const hasRoutines = (st.routines || []).some(r => r.ex && r.ex.length)
+  const split = (st.splits || []).find(sp => sp.id === splitId)
+  const splitRoutineIds = new Set(Object.values(split?.week || {}).filter(Boolean))
+  const hasRoutines = (st.routines || []).some(r => splitRoutineIds.has(r.id) && r.ex && r.ex.length)
 
   const exportFile = async () => {
-    const bundle = buildPlanBundle(st, user?.name ? t('{0}’s plan', user.name) : '')
+    const bundle = buildPlanBundle(st, splitId, split?.name || '')
     const json = JSON.stringify(bundle, null, 2)
     const name = 'opengym-plan-' + todayISO() + '.json'
     if (MOBILE) { try { await shareExport(json, name) } catch (e) { /* dismissed */ } close(); return }
@@ -957,13 +1295,13 @@ function PlanTools({ close }) {
   }
 
   return <>
-    <h3>{t('Share your plan')}</h3>
-    <div className="muted small" style={{ marginBottom: 16 }}>{t('Send your routines to a friend, or put your week on paper.')}</div>
+    <h3>{split ? t('Share “{0}”', split.name) : t('Share your plan')}</h3>
+    <div className="muted small" style={{ marginBottom: 16 }}>{t('Send this split to a friend, or put it on paper.')}</div>
     <Button variant="primary" icon="upload" onClick={exportFile} disabled={!hasRoutines}>{t('Export plan file')}</Button>
     <div className="dim small" style={{ margin: '7px 2px 0', lineHeight: 1.4 }}>{t('A small file a friend imports into their own openGym — routines only, none of your workouts or weigh-ins.')}</div>
     {!MOBILE && <>
       <div style={{ height: 12 }} />
-      <Button variant="tinted" icon="download" onClick={() => { close(); printPlan(st, user?.name || '') }} disabled={!hasRoutines}>{t('Print / Save as PDF')}</Button>
+      <Button variant="tinted" icon="download" onClick={() => { close(); printPlan(st, splitId, user?.name || '') }} disabled={!hasRoutines}>{t('Print / Save as PDF')}</Button>
       <div className="dim small" style={{ margin: '7px 2px 0', lineHeight: 1.4 }}>{t('A clean one-page-per-plan printout — no exercise ever splits across a page.')}</div>
     </>}
     {!hasRoutines && <div className="dim small" style={{ margin: '12px 2px 0' }}>{t('Add an exercise to a routine first — an empty plan has nothing to share.')}</div>}

@@ -148,16 +148,33 @@ public class WorkoutNotificationPlugin extends Plugin {
         }
     }
 
+    private static String capitalizeWords(String text) {
+        if (text == null || text.trim().isEmpty()) return "";
+        String[] words = text.trim().split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < words.length; i++) {
+            if (words[i].length() > 0) {
+                sb.append(Character.toUpperCase(words[i].charAt(0)));
+                if (words[i].length() > 1) {
+                    sb.append(words[i].substring(1));
+                }
+                if (i < words.length - 1) sb.append(" ");
+            }
+        }
+        return sb.toString();
+    }
+
     public static void renderNotification(Context context, State s) {
         if (s == null) return;
         createNotificationChannel(context);
 
         String pkg = context.getPackageName();
         DecimalFormat df = new DecimalFormat("#.##");
+        String formattedName = capitalizeWords(s.exerciseName);
 
         // Small view
         RemoteViews smallViews = new RemoteViews(pkg, R.layout.notification_workout_small);
-        String smallTitle = s.exerciseName + " · Serie " + s.setIndex + "/" + s.totalSets;
+        String smallTitle = formattedName + " · Serie " + s.setIndex + "/" + s.totalSets;
         smallViews.setTextViewText(R.id.notif_small_title, smallTitle);
 
         if (s.isResting) {
@@ -167,7 +184,7 @@ public class WorkoutNotificationPlugin extends Plugin {
                 restSub = "Descanso hasta " + sdf.format(new Date(s.restUntil));
             }
             if (s.nextExName != null && !s.nextExName.isEmpty()) {
-                restSub += " · Sig: " + s.nextExName;
+                restSub += " · Sig: " + capitalizeWords(s.nextExName);
             }
             smallViews.setTextViewText(R.id.notif_small_subtitle, restSub);
             smallViews.setImageViewResource(R.id.notif_small_action, R.drawable.ic_notif_skip);
@@ -181,7 +198,7 @@ public class WorkoutNotificationPlugin extends Plugin {
 
         // Expanded view
         RemoteViews bigViews = new RemoteViews(pkg, R.layout.notification_workout);
-        bigViews.setTextViewText(R.id.notif_title, s.exerciseName);
+        bigViews.setTextViewText(R.id.notif_title, formattedName);
         bigViews.setTextViewText(R.id.notif_set_badge, "Serie " + s.setIndex + "/" + s.totalSets);
 
         if (s.isResting) {

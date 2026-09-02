@@ -25,6 +25,11 @@ describe('mapAuthError', () => {
     expect(mapAuthError(errNetwork)).toBe('Network error — please check your internet connection')
   })
 
+  it('maps user limit exceeded error correctly', () => {
+    const err = { code: 400, type: 'user_count_exceeded', message: 'The current project has exceeded the maximum number of users.' }
+    expect(mapAuthError(err, true)).toBe('The project has reached its user registration limit in Appwrite console')
+  })
+
   it('returns safe fallback without leaking raw backend strings', () => {
     const err = { code: 500, message: 'Internal server error in Appwrite container database at line 140' }
     expect(mapAuthError(err, false)).toBe('Sign-in failed. Please check your credentials.')

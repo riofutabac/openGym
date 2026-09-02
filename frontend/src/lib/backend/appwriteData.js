@@ -72,6 +72,8 @@ export function createAppwriteStateRepo(options = {}) {
       [PROFILE_COLUMNS.TS]: profile.ts || Date.now(),
       [PROFILE_COLUMNS.SETTINGS]: JSON.stringify(profile.settings || {}),
       [PROFILE_COLUMNS.ROUTINES]: JSON.stringify(profile.routines || []),
+      [PROFILE_COLUMNS.SPLITS]: JSON.stringify(profile.splits || []),
+      [PROFILE_COLUMNS.ACTIVE_SPLIT_ID]: profile.activeSplitId || '',
       [PROFILE_COLUMNS.WEEK]: JSON.stringify(profile.week || {}),
       [PROFILE_COLUMNS.DAY_PLAN]: JSON.stringify(profile.dayPlan || {}),
       [PROFILE_COLUMNS.EX_WEIGHTS]: JSON.stringify(profile.exWeights || {}),
@@ -86,6 +88,8 @@ export function createAppwriteStateRepo(options = {}) {
       ts: doc[PROFILE_COLUMNS.TS] || 0,
       settings: safeJsonParse(doc[PROFILE_COLUMNS.SETTINGS], {}),
       routines: safeJsonParse(doc[PROFILE_COLUMNS.ROUTINES], []),
+      splits: safeJsonParse(doc[PROFILE_COLUMNS.SPLITS], []),
+      activeSplitId: doc[PROFILE_COLUMNS.ACTIVE_SPLIT_ID] || null,
       week: safeJsonParse(doc[PROFILE_COLUMNS.WEEK], {}),
       dayPlan: safeJsonParse(doc[PROFILE_COLUMNS.DAY_PLAN], {}),
       exWeights: safeJsonParse(doc[PROFILE_COLUMNS.EX_WEIGHTS], {}),
@@ -279,6 +283,8 @@ export function createAppwriteStateRepo(options = {}) {
           _ts: profile?.ts || 0,
           ...(profile?.settings || {}),
           routines: profile?.routines || [],
+          splits: profile?.splits || [],
+          activeSplitId: profile?.activeSplitId || null,
           week: profile?.week || {},
           dayPlan: profile?.dayPlan || {},
           exWeights: profile?.exWeights || {},
@@ -297,12 +303,14 @@ export function createAppwriteStateRepo(options = {}) {
       if (!user?.id || user.guest || !state) return
 
       // In-progress workout is device-local and must never be saved remotely
-      const { routines, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = state
+      const { routines, splits, activeSplitId, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = state
 
       const profile = {
         ts: _ts || Date.now(),
         settings,
         routines: routines || [],
+        splits: splits || [],
+        activeSplitId: activeSplitId || null,
         week: week || {},
         dayPlan: dayPlan || {},
         exWeights: exWeights || {},

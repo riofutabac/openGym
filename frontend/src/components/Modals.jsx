@@ -56,7 +56,7 @@ function Sheet({ sheet }) {
     return (
       <div>
         <div className="mback" onClick={() => { if (!sheet.locked) close() }} />
-        <div className="center">{sheet.render(close)}</div>
+        <div className="dialog-box">{sheet.render(close)}</div>
       </div>
     )
   }

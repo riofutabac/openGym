@@ -148,8 +148,20 @@ export function buildDemoState() {
     dayPlan[tIso] = order[(order.findIndex(r => r.name === lastName) + 1) % order.length].id
   }
 
+  const demoSplitId = uid()
+  const demoSplits = [
+    {
+      id: demoSplitId,
+      name: 'Push / Pull / Legs (3 días)',
+      emoji: '💪',
+      week: { 1: push.id, 3: pull.id, 5: legs.id }
+    }
+  ]
+
   return {
     routines: [push, pull, legs],
+    splits: demoSplits,
+    activeSplitId: demoSplitId,
     week: { 1: push.id, 3: pull.id, 5: legs.id },
     dayPlan,
     workouts, bodyweight, exWeights,

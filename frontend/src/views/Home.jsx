@@ -4,13 +4,13 @@ import { useStore } from '../store/useStore.js'
 import { effectiveRoutine, effectiveRoutineId, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, isoOf, weekKey, DAYS } from '../lib/format.js'
 import { t, dateLocale } from '../lib/i18n.js'
-import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, workoutDetailSheet, startFlow, loadStarterPlan, bwDeltaColor } from '../sheets.jsx'
+import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, workoutDetailSheet, startFlow, loadStarterPlan, openTemplatesSheet, bwDeltaColor } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Heatmap from '../components/Heatmap.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { glyphOf } from '../lib/glyphs.js'
-import { daysSinceDone } from '../lib/rotation.js'
+import { daysSinceDone, activeWeek, activeSplit } from '../lib/rotation.js'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
@@ -41,7 +41,8 @@ export default function Home() {
   const wkLabel = weekOffset === 0 ? t('This week') : `${monday.getDate()} ${monday.toLocaleDateString(dateLocale(), { month: 'short' })} – ${sunday.getDate()} ${sunday.toLocaleDateString(dateLocale(), { month: 'short' })}`
 
   const wThisWeek = S.workouts.filter(w => weekKey(w.d) === weekKey(todayISO())).length
-  const plannedPerWeek = Object.keys(S.week).filter(k => S.week[k]).length
+  const currentWeekMap = activeWeek(S)
+  const plannedPerWeek = Object.keys(currentWeekMap).filter(k => currentWeekMap[k]).length
   const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
 
   // today's session shown right under the week strip
@@ -65,6 +66,20 @@ export default function Home() {
       </div>
     </div>
 
+    {/* Streak & Weekly summary at the top */}
+    <div className="card tappable" style={{ cursor: 'pointer', marginBottom: 12 }} onClick={() => calendarSheet()}>
+      <div className="row between" style={{ alignItems: 'center' }}>
+        <div>
+          <div className="row" style={{ gap: 7, fontSize: 22, fontWeight: 600, letterSpacing: '-.021em' }}>
+            <Icon name="flame" style={{ color: 'var(--orange)' }} />
+            {t('{0} week streak', streakWeeks(S))}
+          </div>
+          <div className="muted small" style={{ marginTop: 2 }}>{wThisWeek}{plannedPerWeek ? ' / ' + plannedPerWeek : ''} {t('this week')} · {t(S.workouts.length === 1 ? '{0} workout total' : '{0} workouts total', S.workouts.length)}</div>
+        </div>
+        <Icon name="calendar" className="chev" style={{ fontSize: 20 }} />
+      </div>
+    </div>
+
     {!S.routines.length && !S.active && (
       <div className="card">
         <div className="row" style={{ gap: 10, marginBottom: 6 }}>
@@ -72,7 +87,7 @@ export default function Home() {
           <div className="big" style={{ fontSize: 22 }}>{t('Welcome!')}</div>
         </div>
         <div className="muted small" style={{ marginBottom: 12 }}>{t('Set up your weekly routine to get going — or load the ready-made Upper/Lower 4-day plan.')}</div>
-        <Button variant="primary" icon="sparkles" onClick={loadStarterPlan}>{t('Load starter plan (Upper/Lower)')}</Button>
+        <Button variant="primary" icon="sparkles" onClick={openTemplatesSheet}>{t('Plantillas de entrenamiento')}</Button>
         <div style={{ height: 8 }} /><Button onClick={() => nav('/plan')}>{t('Build my own plan')}</Button>
       </div>
     )}
@@ -139,19 +154,6 @@ export default function Home() {
         )}
         <div className="chart" style={{ marginTop: 8 }}><LineChart points={bwPoints} h={130} unit={S.unit} goal={S.targetW} /></div>
       </> : <div className="muted small">{t("No entries yet — log your weight to start the curve. It's also asked before every workout.")}</div>}
-    </div>
-
-    <div className="card tappable" style={{ cursor: 'pointer' }} onClick={() => calendarSheet()}>
-      <div className="row between">
-        <div>
-          <div className="row" style={{ gap: 7, fontSize: 22, fontWeight: 600, letterSpacing: '-.021em' }}>
-            <Icon name="flame" style={{ color: 'var(--orange)' }} />
-            {t('{0} week streak', streakWeeks(S))}
-          </div>
-          <div className="muted small" style={{ marginTop: 2 }}>{wThisWeek}{plannedPerWeek ? ' / ' + plannedPerWeek : ''} {t('this week')} · {t(S.workouts.length === 1 ? '{0} workout total' : '{0} workouts total', S.workouts.length)}</div>
-        </div>
-        <Icon name="calendar" className="chev" style={{ fontSize: 20 }} />
-      </div>
     </div>
   </div>
 }

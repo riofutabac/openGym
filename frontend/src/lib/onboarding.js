@@ -4,6 +4,7 @@ import { todayISO } from './format.js'
 
 export function needsOnboarding(S) {
   if (!S) return false
+  if (S.onboarded) return false
   return !hasData(S) && (!S.bodyweight || S.bodyweight.length === 0)
 }
 
@@ -24,6 +25,7 @@ export function computeTargetWeight(weight, goal) {
 
 export function applyOnboarding(S, answers = {}) {
   const next = S ? { ...S } : {}
+  next.onboarded = true
   if (answers.unit) {
     next.unit = answers.unit
   }

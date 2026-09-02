@@ -8,7 +8,7 @@ import { wakeLockSupported } from '../lib/wakelock.js'
 import { t, LANGS, INSTR_LANGS } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, shareExport, syncReminder, checkExactNotificationSetting, requestNotificationPermissions, openExactAlarmSettings } from '../lib/mobile.js'
-import { loadStarterPlan, confirmSheet, importFromApp } from '../sheets.jsx'
+import { loadStarterPlan, confirmSheet, importFromApp, openTemplatesSheet } from '../sheets.jsx'
 import { media } from '../lib/backend/index.js'
 import Icon from '../components/Icon.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button } from '../components/ui.jsx'
@@ -78,7 +78,16 @@ export default function Settings() {
         <Row icon="signOut" iconTint="var(--red)" title={t('Sign out')} danger onClick={() => confirmSheet({ title: t('Sign out?'), message: t('Your data is synced to your account first, then cleared from this device.'), confirmText: t('Sign out'), danger: true, onConfirm: () => { signOut(); nav('/home') } })} />
         <Row icon="shield" iconTint="var(--red)" title={t('Sign out everywhere')} subtitle={t('Ends this account’s sessions on all your devices.')} danger onClick={signOutEverywhere} />
       </> : (
-        <Row icon="person" iconTint="var(--grey)" title={t('Not signed in')} />
+        <Row
+          icon="person"
+          iconTint="var(--blue)"
+          title={t('Sign in / Create account')}
+          subtitle={t('Sync your workouts across devices')}
+          accessory="chevron"
+          onClick={() => {
+            useStore.getState().setGuest(false)
+          }}
+        />
       )}
     </Section>
     {!user && !DEMO && <p className="sect-f" style={{ marginTop: -18, marginBottom: 22 }}>{t('Guest mode — data lives only in this browser.')}</p>}
@@ -106,18 +115,15 @@ export default function Settings() {
       <Row icon="sound" iconTint="var(--pink)" title={t('Rest timer sound')}>
         <Switch checked={S.sound !== false} onChange={v => update(s => { s.sound = v })} />
       </Row>
-      <Row icon="gauge" iconTint="var(--purple)" title={t('Log set effort')}
-        subtitle={t('Add a column to workouts to track how close each set was to failure.')}>
-        <Segmented className="seg-inline"
-          options={[
-            { value: 'none', label: t('Off') },
-            { value: 'rir', label: t('RIR') },
-            { value: 'rpe', label: t('RPE') },
-          ]}
-          value={effortOf(S)}
-          onChange={v => update(s => { s.effort = v })}
-        />
-      </Row>
+      <SelectRow
+        icon="gauge" iconTint="var(--purple)" title={t('Log set effort')}
+        value={effortOf(S)} onChange={v => update(s => { s.effort = v })}
+        options={[
+          { value: 'none', label: t('Off'), subtitle: t('Do not track set effort') },
+          { value: 'rir', label: t('RIR (Reps in Reserve)'), subtitle: t('How many more reps you could have done before failure') },
+          { value: 'rpe', label: t('RPE (Rate of Perceived Exertion)'), subtitle: t('Effort scale from 6 to 10') },
+        ]}
+      />
       {wakeOK && (
         <Row icon="sun" iconTint="var(--yellow)" title={t('Keep screen awake')} subtitle={t('Prevents the display from sleeping during an active workout.')}>
           <Switch checked={S.keepAwake !== false} onChange={v => update(s => { s.keepAwake = v })} />
@@ -146,16 +152,15 @@ export default function Settings() {
           ))}
         </div>
       </Row>
-      <Row icon="image" iconTint="var(--teal)" title={t('Demonstration animations')}
-        subtitle={t('Shown in exercise details and workout logger.')}>
-        <Segmented className="seg-inline"
-          options={[
-            { value: 'full', label: t('Full') },
-            { value: 'compact', label: t('Compact') },
-            { value: 'off', label: t('Off') },
-          ]}
-          value={S.gifSize || 'full'} onChange={v => update(s => { s.gifSize = v })} />
-      </Row>
+      <SelectRow
+        icon="image" iconTint="var(--teal)" title={t('Demonstration animations')}
+        value={S.gifSize || 'full'} onChange={v => update(s => { s.gifSize = v })}
+        options={[
+          { value: 'full', label: t('Full'), subtitle: t('Full size animations in exercise details and workout logger') },
+          { value: 'compact', label: t('Compact'), subtitle: t('Smaller thumbnails to save screen space') },
+          { value: 'off', label: t('Off'), subtitle: t('Disable exercise GIF animations completely') },
+        ]}
+      />
     </Section>
 
     {/* ---------- notifications ---------- */}
@@ -171,7 +176,7 @@ export default function Settings() {
       <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={doImport} />
       <Row icon="share" iconTint="var(--indigo)" title={t('Import from Hevy / Strong')} subtitle={t('Import routine CSV exports from other workout apps.')} accessory="chevron" onClick={() => importRef.current?.click()} />
       <input ref={importRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={ev => importFromApp(ev.target.files?.[0])} />
-      <Row icon="sparkles" iconTint="var(--acc)" title={t('Load starter plan')} subtitle={t('Load the 4-day Upper/Lower program.')} accessory="chevron" onClick={loadStarterPlan} />
+      <Row icon="sparkles" iconTint="var(--acc)" title={t('Templates')} subtitle={t('Explore and load predefined plans.')} accessory="chevron" onClick={openTemplatesSheet} />
     </Section>
   </div>
 }

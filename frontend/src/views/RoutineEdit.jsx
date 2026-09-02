@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
@@ -14,19 +14,22 @@ import { Button, SelectRow } from '../components/ui.jsx'
 import { POLICIES_FOR, POLICY_NAME, POLICY_DESC } from '../lib/progression.js'
 import BodyMap from '../components/BodyMap.jsx'
 import { loadOfRoutine, rankOf, MUSCLE_NAME } from '../lib/muscles.js'
-import { daysSinceDone } from '../lib/rotation.js'
+import { daysSinceDone, activeSplit } from '../lib/rotation.js'
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun
 
 export default function RoutineEdit() {
   const nav = useNavigate()
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const splitParam = searchParams.get('split')
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
   const r = S.routines.find(x => x.id === id)
   const rIndex = S.routines.findIndex(x => x.id === id)
   const days = r ? daysSinceDone(S, r.id) : null
-  useEffect(() => { if (!r) nav('/plan') }, [!!r])
+  const curSplit = (splitParam && (S.splits || []).find(x => x.id === splitParam)) || activeSplit(S)
+  useEffect(() => { if (!r) nav(splitParam ? '/plan/split/' + splitParam : '/plan') }, [!!r])
   if (!r) return null
 
   const edit = fn => update(s => { fn(s.routines.find(x => x.id === id).ex) })
@@ -40,16 +43,23 @@ export default function RoutineEdit() {
   })
 
   const toggleDay = d => {
-    const prevRid = (S.week || {})[d]
+    if (!curSplit) return
+    const splitId = curSplit.id
+    const prevRid = (curSplit.week || {})[d]
     const prevR = prevRid ? S.routines.find(x => x.id === prevRid) : null
-    const isSelected = (S.week || {})[d] === id
+    const isSelected = (curSplit.week || {})[d] === id
 
     update(s => {
-      s.week = s.week || {}
+      const sp = (s.splits || []).find(x => x.id === splitId)
+      if (!sp) return
+      sp.week = sp.week || {}
       if (isSelected) {
-        delete s.week[d]
+        delete sp.week[d]
       } else {
-        s.week[d] = id
+        sp.week[d] = id
+      }
+      if (s.activeSplitId === splitId) {
+        s.week = { ...sp.week }
       }
     })
 
@@ -72,7 +82,7 @@ export default function RoutineEdit() {
 
   return <div className="narrow">
     <div className="hdr">
-      <button className="iconbtn" onClick={() => nav('/plan')} aria-label={t('Plan')}><Icon name="chevronLeft" /></button>
+      <button className="iconbtn" onClick={() => nav(splitParam ? '/plan/split/' + splitParam : '/plan')} aria-label={t('Plan')}><Icon name="chevronLeft" /></button>
       <div style={{ flex: 1, margin: '0 12px' }}>
         <input className="input" defaultValue={r.name} style={{ fontWeight: 600, fontSize: 20, letterSpacing: '-.021em' }}
           onBlur={e => update(s => { s.routines.find(x => x.id === id).name = e.target.value.trim() || t('Routine') })} />
@@ -85,31 +95,33 @@ export default function RoutineEdit() {
       <span>{lastDoneLabel}</span>
     </div>
 
-    <div className="card" style={{ marginBottom: 16, padding: '12px 14px' }}>
-      <div className="row between" style={{ marginBottom: 4 }}>
-        <span style={{ fontWeight: 600, fontSize: 14 }}>{t('Fixed days of week')}</span>
-        <span className="dim small">{t('Optional')}</span>
+    {curSplit && (
+      <div className="card" style={{ marginBottom: 16, padding: '12px 14px' }}>
+        <div className="row between" style={{ marginBottom: 4 }}>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>{t('Fixed days in {0}', curSplit.name)}</span>
+          <span className="dim small">{t('Optional')}</span>
+        </div>
+        <div className="dim small" style={{ marginBottom: 10 }}>
+          {t('Assign recurring days or leave empty to follow continuous rotation.')}
+        </div>
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          {WEEKDAYS.map(d => {
+            const active = (curSplit.week || {})[d] === id
+            return (
+              <button
+                key={d}
+                type="button"
+                className={'chip' + (active ? ' on' : '')}
+                style={active ? { background: 'var(--acc)', color: 'var(--on-acc)', fontWeight: 600 } : undefined}
+                onClick={() => toggleDay(d)}
+              >
+                {t(DAYS[d])}
+              </button>
+            )
+          })}
+        </div>
       </div>
-      <div className="dim small" style={{ marginBottom: 10 }}>
-        {t('Assign recurring days or leave empty to follow continuous rotation.')}
-      </div>
-      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-        {WEEKDAYS.map(d => {
-          const active = (S.week || {})[d] === id
-          return (
-            <button
-              key={d}
-              type="button"
-              className={'chip' + (active ? ' on' : '')}
-              style={active ? { background: 'var(--acc)', color: 'var(--on-acc)', fontWeight: 600 } : undefined}
-              onClick={() => toggleDay(d)}
-            >
-              {t(DAYS[d])}
-            </button>
-          )
-        })}
-      </div>
-    </div>
+    )}
 
     <div className="sect-b" style={{ marginBottom: 16 }}>
       <SelectRow icon="chartLine" title={t('Progression')} sheetTitle={t('Progression')}
@@ -164,11 +176,20 @@ export default function RoutineEdit() {
       title: t('Delete routine?'), message: t('“{0}” and its exercises will be removed.', r.name), confirmText: t('Delete'), danger: true,
       onConfirm: () => {
         update(s => {
-          s.routines = s.routines.filter(x => x.id !== id)
-          Object.keys(s.week).forEach(k => { if (s.week[k] === id) delete s.week[k] })
-          Object.keys(s.dayPlan).forEach(k => { if (s.dayPlan[k] === id) delete s.dayPlan[k] })
+          s.routines = (s.routines || []).filter(x => x.id !== id)
+          ;(s.splits || []).forEach(sp => {
+            if (sp.week) {
+              Object.keys(sp.week).forEach(k => { if (sp.week[k] === id) delete sp.week[k] })
+            }
+          })
+          if (s.week) {
+            Object.keys(s.week).forEach(k => { if (s.week[k] === id) delete s.week[k] })
+          }
+          if (s.dayPlan) {
+            Object.keys(s.dayPlan).forEach(k => { if (s.dayPlan[k] === id) delete s.dayPlan[k] })
+          }
         })
-        nav('/plan')
+        nav(splitParam ? '/plan/split/' + splitParam : '/plan')
       }
     })}>{t('Delete routine')}</Button>
   </div>

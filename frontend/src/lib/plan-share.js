@@ -45,21 +45,34 @@ function cleanEx(e) {
   if (e.repsMin != null) o.repsMin = e.repsMin
   if (e.repsMax != null) o.repsMax = e.repsMax
   if (e.sg) o.sg = e.sg
+  if (e.restSec != null && e.restSec > 0) o.restSec = e.restSec
   return o
 }
 
-/** Build the shareable bundle: every routine, the week schedule, referenced customs. */
-export function buildPlanBundle(S, name) {
-  const routines = (S.routines || []).map(r => ({
-    id: r.id, name: r.name, emoji: r.emoji, ...(r.prog ? { prog: r.prog } : {}), ex: (r.ex || []).map(cleanEx)
-  }))
-  const usedIds = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
+/** Build the shareable bundle for ONE split: its routines, its week schedule, referenced customs. */
+export function buildPlanBundle(S, splitId, name) {
+  const split = (S.splits || []).find(sp => sp.id === splitId)
+  const splitWeek = split?.week || {}
+  const usedRoutineIds = new Set(Object.values(splitWeek).filter(Boolean))
+  const routines = (S.routines || [])
+    .filter(r => usedRoutineIds.has(r.id))
+    .map(r => ({
+      id: r.id, name: r.name, emoji: r.emoji, ...(r.prog ? { prog: r.prog } : {}), ex: (r.ex || []).map(cleanEx)
+    }))
+  const usedExIds = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
   const customEx = (S.customEx || [])
-    .filter(c => usedIds.has(c.id))
+    .filter(c => usedExIds.has(c.id))
     .map(c => ({ id: c.id, n: c.n, bp: c.bp, ...(c.desc ? { desc: c.desc } : {}) }))
   const week = {}
-  WEEK_ORDER.forEach(d => { if (S.week?.[d]) week[d] = S.week[d] })
-  return { opengym_plan: PLAN_FMT, exported: todayISO(), name: name || '', week, routines, customEx }
+  WEEK_ORDER.forEach(d => { if (splitWeek[d]) week[d] = splitWeek[d] })
+  return {
+    opengym_plan: PLAN_FMT,
+    exported: todayISO(),
+    name: name || split?.name || '',
+    week,
+    routines,
+    customEx
+  }
 }
 
 /**
@@ -103,11 +116,12 @@ export function parsePlan(raw) {
  * Merge a parsed bundle into a draft state `s` (call inside store.update).
  *  - customs: reuse one you already have with the same name + body part, else add it fresh
  *  - routines: always added as NEW routines (fresh ids) — never overwrites yours
- *  - schedule: optional; when on, the shared week REPLACES yours (days the shared plan
- *    leaves empty become rest days — a half-overwritten week would silently mix two plans)
+ *  - the bundle becomes exactly ONE new split, named after the shared plan
+ *  - schedule: optional; when on, that new split becomes the active split
  */
 export function mergePlan(s, bundle, { schedule } = {}) {
   s.customEx = s.customEx || []
+  s.splits = s.splits || []
   const exIdMap = {}
   bundle.customEx.forEach(c => {
     const same = s.customEx.find(x => (x.n || '').toLowerCase() === (c.n || '').toLowerCase() && x.bp === c.bp)
@@ -128,11 +142,22 @@ export function mergePlan(s, bundle, { schedule } = {}) {
       ex: (r.ex || []).map(e => ({ ...e, id: exIdMap[e.id] || e.id }))
     })
   })
+
+  const spId = uid()
+  const spWeek = {}
+  Object.entries(bundle.week || {}).forEach(([d, oldRid]) => {
+    if (ridMap[oldRid]) spWeek[d] = ridMap[oldRid]
+  })
+  s.splits.push({
+    id: spId,
+    name: bundle.name || t('Shared split'),
+    emoji: '💪',
+    week: spWeek
+  })
+
   if (schedule) {
-    WEEK_ORDER.forEach(d => { delete s.week[d] })
-    Object.entries(bundle.week || {}).forEach(([d, oldId]) => {
-      if (ridMap[oldId]) s.week[d] = ridMap[oldId]
-    })
+    s.activeSplitId = spId
+    s.week = { ...spWeek }
   }
   return { routines: bundle.routines.length }
 }
@@ -187,23 +212,26 @@ function routineHTML(r, unit) {
   </section>`
 }
 
-function weekHTML(S) {
+function weekHTML(week, routines) {
   const rows = WEEK_ORDER.map(d => {
-    const r = S.routines.find(x => x.id === S.week?.[d])
+    const r = routines.find(x => x.id === week[d])
     const val = r ? esc(r.name) : `<span class="rest">${esc(t('Rest'))}</span>`
     return `<div class="w-row"><div class="w-day">${esc(t(DAYN[d]))}</div><div class="w-r">${val}</div></div>`
   }).join('')
   return `<div class="week">${rows}</div>`
 }
 
-/** Full self-contained HTML for the print/PDF view. */
-export function planPrintHTML(S, owner) {
+/** Full self-contained HTML for the print/PDF view, scoped to ONE split. */
+export function planPrintHTML(S, splitId, owner) {
   const unit = S.unit || 'kg'
-  const routines = (S.routines || []).filter(r => r.ex && r.ex.length)
+  const split = (S.splits || []).find(sp => sp.id === splitId)
+  const week = split?.week || {}
+  const usedRoutineIds = new Set(Object.values(week).filter(Boolean))
+  const routines = (S.routines || []).filter(r => usedRoutineIds.has(r.id) && r.ex && r.ex.length)
   const body = routines.length
     ? routines.map(r => routineHTML(r, unit)).join('')
     : `<p class="none">${esc(t('No routines yet.'))}</p>`
-  const sub = [owner, todayISO()].filter(Boolean).map(esc).join(' · ')
+  const sub = [split?.name, owner, todayISO()].filter(Boolean).map(esc).join(' · ')
   return `<!doctype html><html><head><meta charset="utf-8">
 <title>${esc(t('Weekly Training Plan'))}</title>
 <style>
@@ -256,7 +284,7 @@ export function planPrintHTML(S, owner) {
     ${sub ? `<div class="sub">${sub}</div>` : ''}
   </header>
   <h3 class="block">${esc(t('Week schedule'))}</h3>
-  ${weekHTML(S)}
+  ${weekHTML(week, S.routines || [])}
   <h3 class="block">${esc(t('Routines'))}</h3>
   ${body}
   <footer>${esc(t('Made with openGym'))} · opengym.duarte-santos.ch</footer>
@@ -267,7 +295,7 @@ export function planPrintHTML(S, owner) {
  * Render the plan and open the browser's print dialog (→ Save as PDF).
  * Uses a hidden iframe so we never navigate away or trip a popup blocker.
  */
-export function printPlan(S, owner) {
+export function printPlan(S, splitId, owner) {
   const ifr = document.createElement('iframe')
   ifr.setAttribute('aria-hidden', 'true')
   ifr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;'
@@ -282,7 +310,7 @@ export function printPlan(S, owner) {
     try { w.print() } catch (e) { cleanup() }
   }
   const doc = ifr.contentWindow.document
-  doc.open(); doc.write(planPrintHTML(S, owner)); doc.close()
+  doc.open(); doc.write(planPrintHTML(S, splitId, owner)); doc.close()
   // Give the iframe a tick to lay out before printing.
   if (doc.readyState === 'complete') setTimeout(run, 120)
   else ifr.onload = () => setTimeout(run, 120)

@@ -1,7 +1,7 @@
 // Pure helpers over the state object S (ported 1:1 from the vanilla app).
 import { todayISO, isoOf, weekKey, fmtNum } from './format.js'
 import { isCardio, isBodyweightEq } from './exercises.js'
-import { nextRoutine } from './rotation.js'
+import { nextRoutine, activeWeek } from './rotation.js'
 import { t } from './i18n.js'
 
 // How an exercise is logged (issue #16). This used to be derived from the body part alone,
@@ -175,9 +175,10 @@ export function effectiveRoutineId(S, iso) {
   const ov = S.dayPlan ? S.dayPlan[iso] : undefined
   if (ov === 'rest') return null
   if (ov && (S.routines || []).some(r => r.id === ov)) return ov
-  if (S.week) {
+  const week = activeWeek(S)
+  if (week) {
     const wd = new Date(iso + 'T12:00:00').getDay()
-    if (S.week[wd]) return S.week[wd]
+    if (week[wd]) return week[wd]
   }
   return nextRoutine(S)?.id || null
 }

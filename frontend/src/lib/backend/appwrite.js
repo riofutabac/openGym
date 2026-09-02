@@ -161,13 +161,22 @@ export function createAppwriteAdapter(options = {}) {
           const ID = await getID()
           const userId = ID.unique()
 
-          await account.create(userId, email, password, name || '')
+          // Delete any existing session so the new user gets their own clean session
+          try {
+            await account.deleteSession('current')
+          } catch {
+            // ignore
+          }
+
+          const cleanName = (name && typeof name === 'string' && name.trim()) ? name.trim() : undefined
+          await account.create(userId, email, password, cleanName)
           await account.createEmailPasswordSession(email, password)
           const acc = await account.get()
           const user = mapUser(acc)
           if (user) writeCachedUser(user)
           return user
         } catch (err) {
+          console.error('[Appwrite register error]', err)
           throw normalizeError(err)
         }
       },
@@ -191,10 +200,19 @@ export function createAppwriteAdapter(options = {}) {
           try {
             await account.createEmailPasswordSession(email, password)
           } catch (err) {
-            // 409: a session is already active — which is what happens after the
-            // app fell back to the login screen while offline. The session was
-            // never gone, so adopt it instead of reporting a failure.
-            if ((err?.code || err?.status) !== 409) throw err
+            // 409: a session is already active — same account, adopt it; a different
+            // account, swap sessions. If the swap itself fails partway (network drop
+            // between delete and re-create), this must fail loudly: silently falling
+            // through would let login(B) return account A's session instead.
+            if ((err?.code || err?.status) === 409) {
+              const existing = await account.get()
+              if (existing?.email && existing.email.toLowerCase() !== email.toLowerCase()) {
+                await account.deleteSession('current')
+                await account.createEmailPasswordSession(email, password)
+              }
+            } else {
+              throw err
+            }
           }
           const acc = await account.get()
           const user = mapUser(acc)

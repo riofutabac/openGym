@@ -15,6 +15,8 @@ export const PROFILE_COLUMNS = {
   TS: 'ts',
   SETTINGS: 'settings',
   ROUTINES: 'routines',
+  SPLITS: 'splits',
+  ACTIVE_SPLIT_ID: 'activeSplitId',
   WEEK: 'week',
   DAY_PLAN: 'dayPlan',
   EX_WEIGHTS: 'exWeights',
