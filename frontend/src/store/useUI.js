@@ -3,25 +3,43 @@ import { uid } from '../lib/format.js'
 import { beep, vibrate } from '../lib/sound.js'
 import { t } from '../lib/i18n.js'
 import { useStore } from './useStore.js'
-import { scheduleRestNotification, cancelRestNotification, updateOngoingWorkoutNotification, clearOngoingWorkoutNotification, onNotificationAction, MOBILE } from '../lib/mobile.js'
-
-import { EXIDX } from '../lib/exercises.js'
+import { scheduleRestNotification, cancelRestNotification, updateOngoingWorkoutNotification, clearOngoingWorkoutNotification, onNotificationAction, WorkoutNotification, MOBILE } from '../lib/mobile.js'
+import { isBw, effectiveRestSec } from '../lib/history.js'
+import { EXIDX, isCardio } from '../lib/exercises.js'
+import { toggleActiveSet } from '../sheets.jsx'
 
 const activeName = () => useStore.getState().S?.active?.name
 
 export const getActiveWorkoutMeta = () => {
-  const active = useStore.getState().S?.active
+  const store = useStore.getState()
+  const active = store.S?.active
   if (!active) return null
   const curIdx = active.cur || 0
   const entry = active.entries[curIdx]
-  const exName = entry ? ((EXIDX[entry.id] || {}).n || entry.id) : active.name
+  const ex = entry ? EXIDX[entry.id] : null
+  const exName = entry ? (ex?.n || entry.id) : active.name
   const totalSets = entry ? entry.sets.length : 0
-  const setIdx = entry ? Math.min(totalSets, entry.sets.filter(s => s.done).length + 1) : 1
+  const doneSets = entry ? entry.sets.filter(s => s.done).length : 0
+  const currentSet = entry ? (entry.sets.find(s => !s.done) || entry.sets[entry.sets.length - 1]) : null
+  const setIdx = entry ? Math.min(totalSets, doneSets + 1) : 1
+  const reps = currentSet?.r ?? entry?.target?.reps ?? 10
+  const weight = currentSet?.w ?? entry?.target?.weight ?? 0
+  const bw = isBw(entry || { id: entry?.id })
+  const cardio = isCardio(entry?.id)
+  const nextEntry = active.entries[curIdx + 1]
+  const nextExName = nextEntry ? (EXIDX[nextEntry.id]?.n || nextEntry.id) : null
+
   return {
     name: active.name,
     exerciseName: exName,
     setIndex: setIdx,
-    totalSets
+    totalSets,
+    reps,
+    weight,
+    weightUnit: store.S?.unit || 'kg',
+    nextExName,
+    isBw: bw,
+    isCardio: cardio
   }
 }
 
@@ -58,6 +76,56 @@ export const syncWorkoutNotification = (restEndsAt) => {
 export const stopWorkoutHeartbeat = () => {
   if (heartbeatInt) { clearInterval(heartbeatInt); heartbeatInt = null }
   clearOngoingWorkoutNotification().catch(() => {})
+}
+
+if (MOBILE && typeof WorkoutNotification?.addListener === 'function') {
+  try {
+    WorkoutNotification.addListener('notificationAction', (event) => {
+      if (!event || !event.action) return
+      const store = useStore.getState()
+      const active = store.S?.active
+      if (!active) return
+
+      const curIdx = active.cur || 0
+      const entry = active.entries[curIdx]
+      if (!entry) return
+
+      if (event.action === 'stepReps') {
+        const sIdx = entry.sets.findIndex(s => !s.done)
+        const targetSetIdx = sIdx >= 0 ? sIdx : entry.sets.length - 1
+        if (targetSetIdx < 0) return
+
+        store.update(s => {
+          const e = s.active.entries[curIdx]
+          if (!e || !e.sets[targetSetIdx]) return
+          const curR = e.sets[targetSetIdx].r ?? e.target?.reps ?? 10
+          e.sets[targetSetIdx].r = Math.max(0, curR + (event.delta || 0))
+        })
+        syncWorkoutNotification()
+      } else if (event.action === 'stepWeight') {
+        const sIdx = entry.sets.findIndex(s => !s.done)
+        const targetSetIdx = sIdx >= 0 ? sIdx : entry.sets.length - 1
+        if (targetSetIdx < 0) return
+
+        store.update(s => {
+          const e = s.active.entries[curIdx]
+          if (!e || !e.sets[targetSetIdx]) return
+          const curW = e.sets[targetSetIdx].w ?? e.target?.weight ?? 0
+          e.sets[targetSetIdx].w = Math.max(0, Math.round((curW + (event.delta || 0)) * 100) / 100)
+        })
+        syncWorkoutNotification()
+      } else if (event.action === 'completeSet') {
+        const sIdx = entry.sets.findIndex(s => !s.done)
+        const targetSetIdx = sIdx >= 0 ? sIdx : entry.sets.length - 1
+        if (targetSetIdx >= 0) {
+          toggleActiveSet(curIdx, targetSetIdx)
+        }
+      } else if (event.action === 'skipRest') {
+        useUI.getState().stopRest()
+        syncWorkoutNotification()
+      }
+    }).catch(() => {})
+  } catch (e) {}
 }
 
 const pushRestTimer = (sec) => {

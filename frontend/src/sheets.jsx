@@ -1337,6 +1337,71 @@ function FinishSummary({ w, prs, e1prs = [], close }) {
     </div>
   )
 }
+
+export function toggleActiveSet(idx, setIdx) {
+  const store = useStore.getState()
+  const st = store.S
+  const A = st?.active
+  if (!A || !A.entries || !A.entries[idx] || !A.entries[idx].sets || !A.entries[idx].sets[setIdx]) return
+
+  const units = supersetUnits(A.entries)
+  const cur = Math.min(A.cur, Math.max(0, A.entries.length - 1))
+  const unit = A.entries.length ? unitOf(units, cur) : []
+  const unitIdx = units.findIndex(u => u === unit)
+  const isLastUnit = unitIdx >= units.length - 1
+
+  let unitJustDone = false
+  let workoutDone = false
+  const ex = EXIDX[A.entries[idx].id]
+  const exName = ex ? ex.n : A.entries[idx].id
+
+  store.update(s => {
+    const e = s.active.entries[idx]
+    if (!e || !e.sets[setIdx]) return
+    e.sets[setIdx].done = !e.sets[setIdx].done
+    if (e.sets[setIdx].done) {
+      beep(st.sound, 1040, 0.12)
+      vibrate(30)
+      const isLastExInUnit = idx === unit[unit.length - 1]
+      const unitDone = unit.every(ui => (ui === idx ? e : s.active.entries[ui]).sets.every(x => x.done))
+
+      // Auto update live highest weight for next time
+      const mx = Math.max(0, ...e.sets.filter(x => x.done).map(x => x.w || 0))
+      if (mx > 0) {
+        const curW = s.exWeights[e.id]
+        if (!curW || mx > curW.w) {
+          s.exWeights[e.id] = { w: mx, d: todayISO() }
+        }
+      }
+
+      if (unitDone) {
+        unitJustDone = true
+        if (isLastUnit) {
+          workoutDone = true
+        } else {
+          const nextUnit = units[unitIdx + 1]
+          const nextEntry = s.active.entries[nextUnit[0]]
+          const nextEx = EXIDX[nextEntry.id]
+          const nextExName = nextEx ? nextEx.n : nextEntry.id
+          const restTime = effectiveRestSec(nextEntry, st.restSec)
+          useUI.getState().startRest(restTime, { betweenExercises: true, nextExName })
+          s.active.cur = units[unitIdx + 1][0]
+        }
+      } else if (isLastExInUnit) {
+        const restTime = effectiveRestSec(e, st.restSec)
+        useUI.getState().startRest(restTime, { betweenExercises: false })
+      }
+    }
+  }, true)
+
+  if (workoutDone) {
+    finishWorkout()
+  } else if (unitJustDone) {
+    useUI.getState().toast(t('{0} completed!', exName))
+  }
+  syncWorkoutNotification()
+}
+
 export function finishWorkout() {
   const A = S().active
   if (!A) return

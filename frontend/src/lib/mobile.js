@@ -10,10 +10,11 @@
 //
 // Note on Capacitor Plugins: NEVER return a plugin proxy directly from an async function or
 // pass it into Promise.resolve(), to avoid the "LocalNotifications.then() is not implemented on android" trap.
-// We wrap it in a plain object `{ plugin }`.
+import { registerPlugin } from '@capacitor/core'
 import { t } from './i18n.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
+export const WorkoutNotification = registerPlugin('WorkoutNotification')
 
 export const WORKOUT_ONGOING_ID = 199
 export const REST_NOTIFICATION_ID = 200
@@ -209,6 +210,28 @@ export async function cancelRestNotification(options = {}) {
 // "rest until 18:42" stays true no matter how long the phone sits in a pocket.
 export async function updateOngoingWorkoutNotification(payload = {}, options = {}) {
   try {
+    if (MOBILE && !options.plugin) {
+      try {
+        const resting = typeof payload.restEndsAt === 'number' && payload.restEndsAt > Date.now()
+        await WorkoutNotification.update({
+          exerciseName: payload.exerciseName || payload.name || t('Workout'),
+          setIndex: payload.setIndex || 1,
+          totalSets: payload.totalSets || 1,
+          reps: Number(payload.reps) || 10,
+          weight: Number(payload.weight) || 0,
+          weightUnit: payload.weightUnit || 'kg',
+          isResting: resting,
+          restUntil: resting ? payload.restEndsAt : 0,
+          nextExName: payload.nextExName || null,
+          isBw: !!payload.isBw,
+          isCardio: !!payload.isCardio
+        })
+        return true
+      } catch (err) {
+        // Fallback to LocalNotifications
+      }
+    }
+
     const { plugin: LocalNotifications } = await getPlugin(options)
     const perm = await LocalNotifications.checkPermissions()
     if (perm.display !== 'granted') return false
@@ -249,6 +272,9 @@ export async function updateOngoingWorkoutNotification(payload = {}, options = {
 // Clear persistent workout notification
 export async function clearOngoingWorkoutNotification(options = {}) {
   try {
+    if (MOBILE && !options.plugin) {
+      WorkoutNotification.clear().catch(() => {})
+    }
     const { plugin: LocalNotifications } = await getPlugin(options)
     await LocalNotifications.cancel({ notifications: [{ id: WORKOUT_ONGOING_ID }] }).catch(() => {})
     return true

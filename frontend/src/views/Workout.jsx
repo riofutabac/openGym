@@ -8,7 +8,7 @@ import { fmtNum, fmtDate, todayISO, exCount, DAYN } from '../lib/format.js'
 import { beep, vibrate } from '../lib/sound.js'
 import { t } from '../lib/i18n.js'
 import Media from '../components/Media.jsx'
-import { startFlow, exerciseDetailSheet, finishWorkout, confirmSheet, effortPickerSheet } from '../sheets.jsx'
+import { startFlow, exerciseDetailSheet, finishWorkout, confirmSheet, effortPickerSheet, toggleActiveSet } from '../sheets.jsx'
 import { clearOngoingWorkoutNotification } from '../lib/mobile.js'
 import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField } from '../components/ui.jsx'
@@ -225,53 +225,7 @@ function ActiveWorkout() {
     })
   }
 
-  const toggle = (idx, i) => {
-    const isLastUnit = unitIdx >= units.length - 1
-    let unitJustDone = false
-    let workoutDone = false
-    const exName = exOr(A.entries[idx].id).n
-
-    mutEntry(idx, e => {
-      e.sets[i].done = !e.sets[i].done
-      if (e.sets[i].done) {
-        beep(S.sound, 1040, 0.12); vibrate(30)
-        const isLastExInUnit = idx === unit[unit.length - 1]
-        const unitDone = unit.every(ui => (ui === idx ? e : A.entries[ui]).sets.every(x => x.done))
-
-        // Auto update live highest weight for next time
-        const mx = Math.max(0, ...e.sets.filter(x => x.done).map(x => x.w || 0))
-        if (mx > 0) {
-          const cur = S.exWeights[e.id]
-          if (!cur || mx > cur.w) {
-            update(st => { st.exWeights[e.id] = { w: mx, d: todayISO() } }, true)
-          }
-        }
-
-        if (unitDone) {
-          unitJustDone = true
-          if (isLastUnit) {
-            workoutDone = true
-          } else {
-            const nextUnit = units[unitIdx + 1]
-            const nextEntry = A.entries[nextUnit[0]]
-            const nextExName = exOr(nextEntry.id).n
-            const restTime = effectiveRestSec(nextEntry, S.restSec)
-            startRest(restTime, { betweenExercises: true, nextExName })
-            update(st => { st.active.cur = units[unitIdx + 1][0] }, true)
-          }
-        } else if (isLastExInUnit) {
-          const restTime = effectiveRestSec(e, S.restSec)
-          startRest(restTime, { betweenExercises: false })
-        }
-      }
-    })
-
-    if (workoutDone) {
-      finishWorkout()
-    } else if (unitJustDone) {
-      useUI.getState().toast(t('{0} completed!', exName))
-    }
-  }
+  const toggle = (idx, i) => toggleActiveSet(idx, i)
 
   const discardPrompt = () => {
     confirmSheet({
