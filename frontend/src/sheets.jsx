@@ -51,14 +51,23 @@ export function openTemplatesSheet() {
 
 export function loadStarterPlan(templateId = 'upper-lower') {
   const { routines, split, template } = instantiateTemplate(templateId)
-  update(st => {
-    st.routines = routines
-    st.splits = [split]
-    st.activeSplitId = split.id
-    st.week = { ...split.week }
-    st.dayPlan = {}
+  const st = useStore.getState().S
+  const existingSplit = (st.splits || []).find(sp => sp.name === template.name)
+  if (existingSplit) {
+    useStore.getState().setActiveSplit(existingSplit.id)
+    toast(`${template.name} ${t('activado como split principal')}`)
+    return
+  }
+  update(s => {
+    s.splits = s.splits || []
+    s.routines = s.routines || []
+    s.routines.push(...routines)
+    s.splits.unshift(split)
+    s.activeSplitId = split.id
+    s.week = { ...split.week }
+    s.dayPlan = {}
   })
-  toast(`${template.name} ${t('cargado con éxito')}`)
+  toast(`${template.name} ${t('añadido y activado')}`)
 }
 
 function TemplatesSheet({ close }) {
@@ -67,26 +76,57 @@ function TemplatesSheet({ close }) {
   const tabListRef = useRef(null)
   const curTpl = TEMPLATES.find(t => t.id === selectedId) || TEMPLATES[0]
 
+  const S = useStore(s => s.S)
+  const splits = S.splits || []
+  const existingSplit = splits.find(sp => sp.name === curTpl.name)
+  const isActive = existingSplit && S.activeSplitId === existingSplit.id
+
   const handleSelect = (id) => {
     setSelectedId(id)
     setExpandedRoutineIdx(null)
   }
 
   const handleApply = () => {
+    if (isActive) {
+      toast(`${curTpl.name} ${t('ya es tu split activo actual')}`)
+      close()
+      return
+    }
+
+    if (existingSplit) {
+      confirmSheet({
+        title: `${t('Activar')} ${curTpl.name}`,
+        message: t('Este split ya existe en tus planes. ¿Deseas activarlo como tu plan semanal principal?'),
+        confirmText: t('Activar split'),
+        onConfirm: () => {
+          update(st => {
+            st.activeSplitId = existingSplit.id
+            st.week = { ...existingSplit.week }
+            st.dayPlan = {}
+          })
+          toast(`${curTpl.name} ${t('activado como split principal')}`)
+          close()
+        }
+      })
+      return
+    }
+
     const { routines, split, template } = instantiateTemplate(curTpl.id)
     confirmSheet({
       title: `${t('Cargar')} ${template.name}`,
-      message: t('¿Deseas cargar este programa? Se configurará el horario semanal y las rutinas predeterminadas.'),
+      message: t('Se creará un nuevo split con sus rutinas y se configurará como tu plan semanal principal.'),
       confirmText: t('Cargar programa'),
       onConfirm: () => {
         update(st => {
-          st.routines = routines
-          st.splits = [split]
+          st.splits = st.splits || []
+          st.routines = st.routines || []
+          st.routines.push(...routines)
+          st.splits.unshift(split)
           st.activeSplitId = split.id
           st.week = { ...split.week }
           st.dayPlan = {}
         })
-        toast(`${template.name} ${t('cargado con éxito')}`)
+        toast(`${template.name} ${t('añadido y activado')}`)
         close()
       }
     })
@@ -202,11 +242,19 @@ function TemplatesSheet({ close }) {
               <span className="badge" style={{ fontSize: 11, background: 'var(--surface-3)', color: 'var(--label-2)' }}>
                 {t('Freq')} {curTpl.freq}
               </span>
-              {curTpl.isDefault && (
+              {isActive ? (
+                <span className="badge" style={{ fontSize: 11, background: 'var(--acc-soft)', color: 'var(--acc)', fontWeight: 600 }}>
+                  ✓ {t('Activo actualmente')}
+                </span>
+              ) : existingSplit ? (
+                <span className="badge" style={{ fontSize: 11, background: 'var(--surface-3)', color: 'var(--blue)', fontWeight: 600 }}>
+                  {t('Guardado en tus planes')}
+                </span>
+              ) : curTpl.isDefault ? (
                 <span className="badge" style={{ fontSize: 11, background: 'var(--acc-soft)', color: 'var(--acc)', fontWeight: 600 }}>
                   {t('Recomendado')}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -328,14 +376,18 @@ function TemplatesSheet({ close }) {
         </div>
       </div>
 
-      {/* Apply Button */}
+      {/* Apply / Activate Button */}
       <Button
-        variant="primary"
-        icon="sparkles"
+        variant={isActive ? 'ghost' : 'primary'}
+        icon={isActive ? 'check' : existingSplit ? 'play' : 'sparkles'}
         onClick={handleApply}
         style={{ width: '100%', height: 48, fontSize: 16, fontWeight: 600, marginTop: 4 }}
       >
-        {t('Cargar')} {curTpl.shortName || curTpl.name}
+        {isActive
+          ? t('Ya es tu plan activo')
+          : existingSplit
+          ? `${t('Activar')} ${curTpl.shortName || curTpl.name}`
+          : `${t('Cargar')} ${curTpl.shortName || curTpl.name}`}
       </Button>
     </div>
   )
