@@ -33,7 +33,7 @@ export default function Plan() {
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <Button size="sm" variant="ghost" icon="sparkles" onClick={openTemplatesSheet}>
-            {t('Plantillas')}
+            {t('Templates')}
           </Button>
           <Button size="sm" variant="tinted" icon="plus" onClick={handleCreateSplit}>
             {t('New')}
@@ -51,7 +51,7 @@ export default function Plan() {
             </div>
           </div>
           <Button variant="primary" icon="sparkles" onClick={openTemplatesSheet}>
-            {t('Plantillas de entrenamiento')}
+            {t('Workout templates')}
           </Button>
           <div style={{ height: 10 }} />
           <Button variant="ghost" icon="plus" onClick={handleCreateSplit}>

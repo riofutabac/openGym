@@ -3,6 +3,7 @@ import { useStore, migrateSplits, DEF } from './useStore.js'
 import { activeSplit, activeWeek, seedRotationFromWeek } from '../lib/rotation.js'
 import { effectiveRoutineId } from '../lib/history.js'
 import { buildPlanBundle, parsePlan, mergePlan } from '../lib/plan-share.js'
+import { instantiateTemplate } from '../lib/starter.js'
 
 const mockStorage = new Map()
 globalThis.localStorage = {
@@ -102,22 +103,31 @@ describe('Split Container Model & Reusable Routines', () => {
       expect(activeWeek(S)).toEqual({ 1: 'rA' })
     })
 
-    it('deletes a split and falls back activeSplitId to next split', () => {
+    it('deletes a split and cleans up its exclusive routines from routines library', () => {
       const store = useStore.getState()
-      const sp1 = store.createSplit({ name: 'Split 1', week: { 1: 'r1' } })
-      const sp2 = store.createSplit({ name: 'Split 2', week: { 2: 'r2' } })
+      store.update(s => {
+        s.routines = [
+          { id: 'r1', name: 'R1', ex: [] },
+          { id: 'r2', name: 'R2', ex: [] },
+          { id: 'r_shared', name: 'R Shared', ex: [] }
+        ]
+      })
+      const sp1 = store.createSplit({ name: 'Split 1', week: { 1: 'r1', 3: 'r_shared' } })
+      const sp2 = store.createSplit({ name: 'Split 2', week: { 2: 'r2', 4: 'r_shared' } })
 
       store.deleteSplit(sp2.id)
 
       const S = useStore.getState().S
       expect(S.splits).toHaveLength(1)
       expect(S.activeSplitId).toBe(sp1.id)
-      expect(activeWeek(S)).toEqual({ 1: 'r1' })
+      expect(activeWeek(S)).toEqual({ 1: 'r1', 3: 'r_shared' })
+      // r2 was exclusively in sp2 and should be removed, while r1 and r_shared remain
+      expect(S.routines.map(r => r.id)).toEqual(['r1', 'r_shared'])
     })
   })
 
   describe('Effective Routine Resolution with Active Split', () => {
-    it('resolves routine from active split week according to date day-of-week', () => {
+    it('resolves routine from active split week and returns null for unassigned rest days', () => {
       const rUpper = { id: 'r_upper', name: 'Upper', ex: [] }
       const rLower = { id: 'r_lower', name: 'Lower', ex: [] }
 
@@ -138,6 +148,10 @@ describe('Split Container Model & Reusable Routines', () => {
       // Tuesday (day 2) -> 2026-09-08 is a Tuesday
       const tuesdayIso = '2026-09-08'
       expect(effectiveRoutineId(S, tuesdayIso)).toBe('r_lower')
+
+      // Wednesday (day 3) -> 2026-09-09 is Wednesday (Rest day in this split)
+      const wednesdayIso = '2026-09-09'
+      expect(effectiveRoutineId(S, wednesdayIso)).toBeNull()
     })
   })
 
@@ -254,6 +268,45 @@ describe('Split Container Model & Reusable Routines', () => {
       expect(S.splits.find(sp => sp.id === spActive.id).week).toEqual({ 1: 'r1', 3: 'r2' })
       // Active week unchanged
       expect(S.week).toEqual({ 1: 'r1', 3: 'r2' })
+    })
+
+    it('sequentially loading multiple template programs preserves both splits and updates activeWeek', () => {
+      const { routines: rUpperLower, split: splitUL } = instantiateTemplate('upper-lower')
+      const { routines: rPPL, split: splitPPL } = instantiateTemplate('ppl-6d')
+
+      const store = useStore.getState()
+      // Load first template (Upper/Lower)
+      store.update(st => {
+        st.splits = [splitUL]
+        st.routines = [...rUpperLower]
+        st.activeSplitId = splitUL.id
+        st.week = { ...splitUL.week }
+      })
+
+      expect(useStore.getState().S.splits).toHaveLength(1)
+      expect(activeSplit(useStore.getState().S).name).toBe(splitUL.name)
+      expect(activeWeek(useStore.getState().S)).toEqual(splitUL.week)
+
+      // Load second template (PPL 6D) as a new split
+      store.update(st => {
+        st.routines.push(...rPPL)
+        st.splits.unshift(splitPPL)
+        st.activeSplitId = splitPPL.id
+        st.week = { ...splitPPL.week }
+      })
+
+      const S2 = useStore.getState().S
+      expect(S2.splits).toHaveLength(2)
+      expect(S2.activeSplitId).toBe(splitPPL.id)
+      expect(activeSplit(S2).name).toBe(splitPPL.name)
+      expect(activeWeek(S2)).toEqual(splitPPL.week)
+
+      // Switching back to Upper/Lower activates it cleanly
+      store.setActiveSplit(splitUL.id)
+      const S3 = useStore.getState().S
+      expect(S3.activeSplitId).toBe(splitUL.id)
+      expect(activeSplit(S3).name).toBe(splitUL.name)
+      expect(activeWeek(S3)).toEqual(splitUL.week)
     })
   })
 })

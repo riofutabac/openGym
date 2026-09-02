@@ -262,33 +262,16 @@ function ActiveWorkout() {
   const allDone = A.entries.length > 0 && exDone === A.entries.length
 
   return <div className="narrow">
-    {timer ? (
-      <div className="rest-hdr">
-        <div className="rest-top">
-          <span className="rest-tag">
-            <Icon name={timer.betweenExercises ? 'forward' : 'pause'} />
-            {' '}
-            {timer.betweenExercises
-              ? (timer.nextExName ? t('Next: {0}', timer.nextExName) : t('Rest between exercises'))
-              : t('Resting between sets')}
-          </span>
-          <button className="iconbtn" aria-label={t('Discard')} onClick={discardPrompt}><Icon name="xmark" /></button>
+    <div className="hdr" style={{ alignItems: 'center', marginBottom: 12 }}>
+      <button className="iconbtn" aria-label={t('Discard')} onClick={discardPrompt}><Icon name="xmark" /></button>
+      <div style={{ textAlign: 'center', flex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>{A.name}</div>
+        <div className="sub" style={{ fontSize: 13, marginTop: 2 }}>
+          <Elapsed start={A.start} /> · {t('{0} sets', done + '/' + total)}
         </div>
-        <div className="rest-clock">{Math.floor(timer.left / 60)}:{String(timer.left % 60).padStart(2, '0')}</div>
-        <div className="rest-bar"><i style={{ width: ((timer.left / timer.total) * 100) + '%' }} /></div>
       </div>
-    ) : (
-      <div className="hdr" style={{ alignItems: 'center', marginBottom: 12 }}>
-        <button className="iconbtn" aria-label={t('Discard')} onClick={discardPrompt}><Icon name="xmark" /></button>
-        <div style={{ textAlign: 'center', flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>{A.name}</div>
-          <div className="sub" style={{ fontSize: 13, marginTop: 2 }}>
-            <Elapsed start={A.start} /> · {t('{0} sets', done + '/' + total)}
-          </div>
-        </div>
-        <div style={{ width: 36 }} />
-      </div>
-    )}
+      <div style={{ width: 36 }} />
+    </div>
 
     {/* Top exercise navigation bar */}
     <div className="row between" style={{ alignItems: 'center', background: 'var(--surface-1)', padding: '6px 10px', borderRadius: 'var(--r-md)', marginBottom: 10 }}>

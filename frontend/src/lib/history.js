@@ -176,9 +176,9 @@ export function effectiveRoutineId(S, iso) {
   if (ov === 'rest') return null
   if (ov && (S.routines || []).some(r => r.id === ov)) return ov
   const week = activeWeek(S)
-  if (week) {
+  if (week && Object.keys(week).length > 0) {
     const wd = new Date(iso + 'T12:00:00').getDay()
-    if (week[wd]) return week[wd]
+    return week[wd] || null
   }
   return nextRoutine(S)?.id || null
 }

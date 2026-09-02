@@ -189,7 +189,7 @@ export default function SplitEdit() {
         variant="danger"
         onClick={() => confirmSheet({
           title: t('Delete split?'),
-          message: t('“{0}” will be deleted. The routines in this split will stay in your library.', split.name),
+          message: t('“{0}” and its associated routines will be deleted.', split.name),
           confirmText: t('Delete'),
           danger: true,
           onConfirm: () => {

@@ -22,6 +22,7 @@ import { estimate1RM, best1RM, is1RMRecord, REP_CAP, e1rmSeries } from './lib/on
 import { hasEffort, displayScale, toScale, avgRir } from './lib/effort.js'
 import { nextPrescription, applyPrescription, policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS } from './lib/progression.js'
 import { MOBILE, shareExport, updateOngoingWorkoutNotification, clearOngoingWorkoutNotification } from './lib/mobile.js'
+import { activeWeek, activeSplit } from './lib/rotation.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -55,7 +56,7 @@ export function loadStarterPlan(templateId = 'upper-lower') {
   const existingSplit = (st.splits || []).find(sp => sp.name === template.name)
   if (existingSplit) {
     useStore.getState().setActiveSplit(existingSplit.id)
-    toast(`${template.name} ${t('activado como split principal')}`)
+    toast(`${template.name} ${t('activated as your main split')}`)
     return
   }
   update(s => {
@@ -67,7 +68,7 @@ export function loadStarterPlan(templateId = 'upper-lower') {
     s.week = { ...split.week }
     s.dayPlan = {}
   })
-  toast(`${template.name} ${t('añadido y activado')}`)
+  toast(`${template.name} ${t('added and activated')}`)
 }
 
 function TemplatesSheet({ close }) {
@@ -88,23 +89,23 @@ function TemplatesSheet({ close }) {
 
   const handleApply = () => {
     if (isActive) {
-      toast(`${curTpl.name} ${t('ya es tu split activo actual')}`)
+      toast(`${curTpl.name} ${t('is already your active split')}`)
       close()
       return
     }
 
     if (existingSplit) {
       confirmSheet({
-        title: `${t('Activar')} ${curTpl.name}`,
-        message: t('Este split ya existe en tus planes. ¿Deseas activarlo como tu plan semanal principal?'),
-        confirmText: t('Activar split'),
+        title: `${t('Activate')} ${curTpl.name}`,
+        message: t('This split already exists in your plans. Activate it as your main weekly plan?'),
+        confirmText: t('Activate split'),
         onConfirm: () => {
           update(st => {
             st.activeSplitId = existingSplit.id
             st.week = { ...existingSplit.week }
             st.dayPlan = {}
           })
-          toast(`${curTpl.name} ${t('activado como split principal')}`)
+          toast(`${curTpl.name} ${t('activated as your main split')}`)
           close()
         }
       })
@@ -113,9 +114,9 @@ function TemplatesSheet({ close }) {
 
     const { routines, split, template } = instantiateTemplate(curTpl.id)
     confirmSheet({
-      title: `${t('Cargar')} ${template.name}`,
-      message: t('Se creará un nuevo split con sus rutinas y se configurará como tu plan semanal principal.'),
-      confirmText: t('Cargar programa'),
+      title: `${t('Load')} ${template.name}`,
+      message: t('A new split will be created with its routines and set as your main weekly plan.'),
+      confirmText: t('Load program'),
       onConfirm: () => {
         update(st => {
           st.splits = st.splits || []
@@ -126,7 +127,7 @@ function TemplatesSheet({ close }) {
           st.week = { ...split.week }
           st.dayPlan = {}
         })
-        toast(`${template.name} ${t('añadido y activado')}`)
+        toast(`${template.name} ${t('added and activated')}`)
         close()
       }
     })
@@ -140,10 +141,10 @@ function TemplatesSheet({ close }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--label)' }}>
-            {t('Programas de entrenamiento')}
+            {t('Training programs')}
           </h3>
           <div style={{ fontSize: 13, color: 'var(--label-2)', marginTop: 2 }}>
-            {t('100% Máquinas y poleas · Cero carga axial')}
+            {t('100% machines & pulleys · Zero axial load')}
           </div>
         </div>
         <button
@@ -237,22 +238,22 @@ function TemplatesSheet({ close }) {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <span className="badge" style={{ fontSize: 11, background: 'var(--surface-3)', color: 'var(--label)' }}>
-                {curTpl.daysCount} {t('días / sem')}
+                {curTpl.daysCount} {t('days / wk')}
               </span>
               <span className="badge" style={{ fontSize: 11, background: 'var(--surface-3)', color: 'var(--label-2)' }}>
                 {t('Freq')} {curTpl.freq}
               </span>
               {isActive ? (
                 <span className="badge" style={{ fontSize: 11, background: 'var(--acc-soft)', color: 'var(--acc)', fontWeight: 600 }}>
-                  ✓ {t('Activo actualmente')}
+                  ✓ {t('Currently active')}
                 </span>
               ) : existingSplit ? (
                 <span className="badge" style={{ fontSize: 11, background: 'var(--surface-3)', color: 'var(--blue)', fontWeight: 600 }}>
-                  {t('Guardado en tus planes')}
+                  {t('Saved in your plans')}
                 </span>
               ) : curTpl.isDefault ? (
                 <span className="badge" style={{ fontSize: 11, background: 'var(--acc-soft)', color: 'var(--acc)', fontWeight: 600 }}>
-                  {t('Recomendado')}
+                  {t('Recommended')}
                 </span>
               ) : null}
             </div>
@@ -266,7 +267,7 @@ function TemplatesSheet({ close }) {
         {/* Weekly Schedule Breakdown */}
         <div>
           <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--label-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-            {t('Distribución semanal')}
+            {t('Weekly schedule')}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -295,7 +296,7 @@ function TemplatesSheet({ close }) {
                     <span style={{ fontWeight: 600, color: 'var(--label-3)', width: 36, fontSize: 12 }}>
                       {t(DAYN[dayIdx]).slice(0, 3)}
                     </span>
-                    <span style={{ color: 'var(--label-3)', fontSize: 12.5 }}>{t('Descanso')}</span>
+                    <span style={{ color: 'var(--label-3)', fontSize: 12.5 }}>{t('Rest')}</span>
                     <span style={{ width: 16 }} />
                   </div>
                 )
@@ -341,7 +342,7 @@ function TemplatesSheet({ close }) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 11.5, color: 'var(--label-3)' }}>
-                        {r[2].length} {t('ejercicios')}
+                        {exCount(r[2].length)}
                       </span>
                       <Icon name={isExpanded ? 'chevronUp' : 'chevronDown'} size={14} style={{ color: 'var(--label-3)' }} />
                     </div>
@@ -384,10 +385,10 @@ function TemplatesSheet({ close }) {
         style={{ width: '100%', height: 48, fontSize: 16, fontWeight: 600, marginTop: 4 }}
       >
         {isActive
-          ? t('Ya es tu plan activo')
+          ? t('Already your active plan')
           : existingSplit
-          ? `${t('Activar')} ${curTpl.shortName || curTpl.name}`
-          : `${t('Cargar')} ${curTpl.shortName || curTpl.name}`}
+          ? `${t('Activate')} ${curTpl.shortName || curTpl.name}`
+          : `${t('Load')} ${curTpl.shortName || curTpl.name}`}
       </Button>
     </div>
   )
@@ -1402,9 +1403,17 @@ function PlanImport({ bundle, close }) {
 function DayOverride({ iso, close }) {
   const st = useStore(s => s.S)
   const wd = new Date(iso + 'T12:00:00').getDay()
-  const weeklyR = st.routines.find(r => r.id === st.week[wd])
+  const activeW = activeWeek(st)
+  const weeklyR = st.routines.find(r => r.id === activeW[wd])
   const hasOvr = st.dayPlan[iso] !== undefined
   const effId = effectiveRoutineId(st, iso)
+
+  // Show only routines belonging to the active split
+  const activeRoutineIds = new Set(Object.values(activeW || {}))
+  const routinesList = activeRoutineIds.size > 0
+    ? st.routines.filter(r => activeRoutineIds.has(r.id))
+    : st.routines
+
   const set = v => {
     update(s => { if (!v) delete s.dayPlan[iso]; else s.dayPlan[iso] = v })
     close()
@@ -1414,7 +1423,7 @@ function DayOverride({ iso, close }) {
     <h3>{fmtDate(iso, true)}</h3>
     <div className="muted small" style={{ marginBottom: 12 }}>{t('Weekly plan:')} {weeklyR ? weeklyR.name : t('Rest')}{hasOvr && <span style={{ color: 'var(--orange)' }}> · {t('changed for this day')}</span>}<br />{t('Sick, missed a day or want a different session? Pick what to train instead.')}</div>
     <div className="list">
-      {st.routines.map(r => <div key={r.id} className="item" onClick={() => set(r.id)}>
+      {routinesList.map(r => <div key={r.id} className="item" onClick={() => set(r.id)}>
         <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
         <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
         {effId === r.id && <Icon name="check" className="accent" />}</div>)}

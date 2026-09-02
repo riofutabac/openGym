@@ -548,21 +548,7 @@ h4.sec{
 .exmedia.compact img{height:120px}
 .exmedia.mini img{height:84px}
 
-/* --- giant rest header --- */
-.rest-hdr{
-  background:var(--surface-2);border-radius:var(--r-lg);padding:14px 16px 12px;
-  margin:4px 0 16px;text-align:center;box-shadow:0 8px 24px -4px rgba(0,0,0,.35);
-  border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);
-}
-.rest-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
-.rest-tag{font-size:13px;font-weight:600;color:var(--acc);display:inline-flex;align-items:center;gap:6px}
-.rest-clock{
-  font-size:58px;font-weight:800;letter-spacing:-.03em;
-  font-variant-numeric:tabular-nums;line-height:1;margin:4px 0 10px;
-  color:var(--fg);
-}
-.rest-bar{height:6px;background:var(--surface-3);border-radius:99px;overflow:hidden}
-.rest-bar i{display:block;height:100%;background:var(--acc);transition:width 1s linear;border-radius:99px}
+
 
 /* --- set rows & hero active set --- */
 .sethead{

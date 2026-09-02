@@ -87,7 +87,7 @@ export default function Home() {
           <div className="big" style={{ fontSize: 22 }}>{t('Welcome!')}</div>
         </div>
         <div className="muted small" style={{ marginBottom: 12 }}>{t('Set up your weekly routine to get going — or load the ready-made Upper/Lower 4-day plan.')}</div>
-        <Button variant="primary" icon="sparkles" onClick={openTemplatesSheet}>{t('Plantillas de entrenamiento')}</Button>
+        <Button variant="primary" icon="sparkles" onClick={openTemplatesSheet}>{t('Workout templates')}</Button>
         <div style={{ height: 8 }} /><Button onClick={() => nav('/plan')}>{t('Build my own plan')}</Button>
       </div>
     )}

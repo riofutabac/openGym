@@ -215,41 +215,48 @@ export const useUI = create((set, get) => ({
      purpose: the two mean opposite things, they must never run together, and a work set is
      something you are watching — so it gets no server push (that endpoint says "rest over",
      and a plank does not need a notification you are staring at anyway).
-     `onDone(elapsedSec)` is called both when the countdown reaches zero and on an early
-     finish; the elapsed time is what actually gets logged, so stopping at 0:38 of a 0:45
-     hold records 0:38 rather than crediting the full target. */
+     Times the set itself, not the recovery after it. Kept separate from the rest timer on
+     purpose: the two mean opposite things, they must never run together, and a work set is
+     something you are watching — so it gets no server push (that endpoint says "rest over",
+     and a plank does not need a notification you are staring at anyway).
+     `onDone(elapsedSec)` is called on finish; the actual elapsed time is what gets logged,
+     so stopping at 0:38 of a 0:45 target records 0:38, and holding past 0:45 (e.g. 0:52) records 0:52.
+     The prescribed duration is an advisory target, not a hard cutoff. */
   startWork(sec, label, onDone) {
     get().stopWork()
     get().stopRest()
     const total = Math.max(1, Math.round(sec) || 1)
-    const endsAt = Date.now() + total * 1000
+    const startedAt = Date.now()
+    const endsAt = startedAt + total * 1000
     workDone = onDone
-    set({ work: { left: total, total, endsAt, label } })
+    set({ work: { left: total, total, startedAt, endsAt, label, targetReached: false } })
     workTick = () => {
       const wk = get().work
       if (!wk) return
-      const left = Math.max(0, Math.round((wk.endsAt - Date.now()) / 1000))
-      if (left === wk.left) return
+      const now = Date.now()
+      const left = Math.round((wk.endsAt - now) / 1000)
+      const elapsed = Math.max(0, Math.round((now - wk.startedAt) / 1000))
       const snd = useStore.getState().S.sound
-      if (left <= 0) {
+
+      if (left <= 0 && !wk.targetReached) {
         beep(snd, 880, 0.15); beep(snd, 880, 0.15, 0.25); beep(snd, 1320, 0.4, 0.5)
         vibrate([200, 100, 200])
-        const done = workDone
-        get().stopWork()
-        if (done) done(wk.total)
+        set({ work: { ...wk, left, elapsed, targetReached: true } })
         return
       }
-      if (left <= 3) beep(snd, 660, 0.1)
-      set({ work: { ...wk, left } })
+      if (left > 0 && left <= 3 && !wk.targetReached) {
+        beep(snd, 660, 0.1)
+      }
+      set({ work: { ...wk, left, elapsed } })
     }
     workInt = setInterval(workTick, 1000)
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', workTick)
   },
-  // Ended the hold early — log what was actually held.
+  // User confirmed completion — log the actual time held (early, on time, or beyond target).
   finishWorkEarly() {
     const wk = get().work
     if (!wk) return
-    const elapsed = Math.max(1, wk.total - wk.left)
+    const elapsed = Math.max(1, Math.round((Date.now() - (wk.startedAt || (wk.endsAt - wk.total * 1000))) / 1000))
     const done = workDone
     vibrate(30)
     get().stopWork()

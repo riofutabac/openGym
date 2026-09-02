@@ -51,6 +51,19 @@ export function migrateSplits(s) {
     if (curSplit) {
       s.week = { ...curSplit.week }
     }
+
+    // Clean up any orphaned routines whose split was previously deleted
+    const allUsedRoutineIds = new Set(s.splits.flatMap(sp => Object.values(sp.week || {})))
+    if (allUsedRoutineIds.size > 0) {
+      s.routines = s.routines.filter(r => allUsedRoutineIds.has(r.id))
+      if (s.dayPlan) {
+        Object.keys(s.dayPlan).forEach(k => {
+          if (s.dayPlan[k] !== 'rest' && !allUsedRoutineIds.has(s.dayPlan[k])) {
+            delete s.dayPlan[k]
+          }
+        })
+      }
+    }
   } else {
     s.activeSplitId = null
   }
@@ -188,7 +201,28 @@ export const useStore = create((set, get) => {
 
     deleteSplit(id) {
       get().update(s => {
+        const deletedSplit = (s.splits || []).find(sp => sp.id === id)
         s.splits = (s.splits || []).filter(sp => sp.id !== id)
+
+        if (deletedSplit) {
+          // Find routines belonging to the deleted split that are not used by any remaining split
+          const remainingUsedRoutines = new Set(
+            (s.splits || []).flatMap(sp => Object.values(sp.week || {}))
+          )
+          const deletedRoutines = Object.values(deletedSplit.week || {})
+          const routinesToRemove = new Set(
+            deletedRoutines.filter(rid => rid && !remainingUsedRoutines.has(rid))
+          )
+          if (routinesToRemove.size > 0) {
+            s.routines = (s.routines || []).filter(r => !routinesToRemove.has(r.id))
+            if (s.dayPlan) {
+              Object.keys(s.dayPlan).forEach(k => {
+                if (routinesToRemove.has(s.dayPlan[k])) delete s.dayPlan[k]
+              })
+            }
+          }
+        }
+
         if (s.activeSplitId === id) {
           s.activeSplitId = s.splits.length ? s.splits[0].id : null
           s.week = s.splits.length ? { ...s.splits[0].week } : {}
@@ -237,11 +271,13 @@ export const useStore = create((set, get) => {
       try {
         if (stateRepo.supportsPerSessionRows) {
           // 1. Profile: active is device-local and must never leak into remote profile
-          const { routines, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S
+          const { routines, splits, activeSplitId, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S
           const profile = {
             ts: _ts || Date.now(),
             settings,
             routines: routines || [],
+            splits: splits || [],
+            activeSplitId: activeSplitId || null,
             week: week || {},
             dayPlan: dayPlan || {},
             exWeights: exWeights || {},
@@ -297,8 +333,19 @@ export const useStore = create((set, get) => {
             next.exWeights = remoteProf.exWeights || {}
             next.customEx = remoteProf.customEx || []
             next.bodyweight = remoteProf.bodyweight || []
+
+            const prevRoutinesLen = next.routines.length
             migrateSplits(next)
-            syncQueue.setProfileDirty(false)
+            if (next.routines.length !== prevRoutinesLen) {
+              // Remote profile contained orphaned routines that have now been purged:
+              // persist locally and immediately push cleaned state to cloud!
+              next._ts = Date.now()
+              persist(next, false)
+              syncQueue.setProfileDirty(true)
+              setTimeout(() => { get().pushState() }, 50)
+            } else {
+              syncQueue.setProfileDirty(false)
+            }
           } else if (hasData(S)) {
             // Local profile is newer or dirty: push to remote
             const { routines, splits, activeSplitId, week, dayPlan, exWeights, customEx, bodyweight, workouts, active, _ts, ...settings } = S

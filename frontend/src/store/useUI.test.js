@@ -48,4 +48,38 @@ describe('useUI - Rest Timer and Native Notifications Integration', () => {
     // Calling stopRest again when no timer is active runs cleanly
     expect(() => useUI.getState().stopRest()).not.toThrow()
   })
+
+  it('startWork tracks target duration as advisory and finishWorkEarly logs actual elapsed time', () => {
+    let loggedSec = 0
+    useUI.getState().startWork(45, 'Plank', (sec) => {
+      loggedSec = sec
+    })
+
+    const work = useUI.getState().work
+    expect(work).not.toBeNull()
+    expect(work.total).toBe(45)
+    expect(work.label).toBe('Plank')
+
+    // Simulate stopping early at 30s
+    useUI.setState({ work: { ...work, startedAt: Date.now() - 30000 } })
+    useUI.getState().finishWorkEarly()
+    expect(loggedSec).toBe(30)
+    expect(useUI.getState().work).toBeNull()
+  })
+
+  it('startWork allows holding past target duration and logs overtime correctly', () => {
+    let loggedSec = 0
+    useUI.getState().startWork(45, 'Plank', (sec) => {
+      loggedSec = sec
+    })
+
+    const work = useUI.getState().work
+    expect(work).not.toBeNull()
+
+    // Simulate holding past target to 55s
+    useUI.setState({ work: { ...work, startedAt: Date.now() - 55000 } })
+    useUI.getState().finishWorkEarly()
+    expect(loggedSec).toBe(55)
+    expect(useUI.getState().work).toBeNull()
+  })
 })
