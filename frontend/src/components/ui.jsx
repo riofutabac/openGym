@@ -248,7 +248,7 @@ export function Row({ icon, iconTint, title, subtitle, value, accessory = 'none'
 // theme entirely — on dark mode it flashes a white sheet — and can't show more
 // than a bare label per option. This opens our own sheet with a checkmark on the
 // current value, which is also how iOS itself handles a long option list.
-export function SelectRow({ icon, iconTint, title, value, options, onChange, sheetTitle }) {
+export function SelectRow({ icon, iconTint, title, value, options, onChange, sheetTitle, renderValue }) {
   const cur = options.find(o => o.value === value)
   const open = () => {
     const { openSheet } = require_ui()
@@ -258,6 +258,7 @@ export function SelectRow({ icon, iconTint, title, value, options, onChange, she
         <div className="sect-b">
           {options.map(o => (
             <button key={o.value} className="lrow tap" onClick={() => { close(); onChange(o.value) }}>
+              {o.swatch && <span style={{ width: 22, height: 22, borderRadius: '50%', background: o.swatch, marginRight: 12, flexShrink: 0, boxShadow: '0 0 0 1px rgba(255,255,255,0.15)' }} />}
               <span className="lrow-m"><span className="lrow-t">{o.label}</span>
                 {o.subtitle && <span className="lrow-s">{o.subtitle}</span>}</span>
               {o.value === value && <Icon name="check" className="lrow-k" />}
@@ -270,7 +271,14 @@ export function SelectRow({ icon, iconTint, title, value, options, onChange, she
     return h
   }
   return (
-    <Row icon={icon} iconTint={iconTint} title={title} value={cur ? cur.label : value} accessory="chevron" onClick={open} />
+    <Row
+      icon={icon}
+      iconTint={iconTint}
+      title={title}
+      value={renderValue ? renderValue(cur) : (cur ? cur.label : value)}
+      accessory="chevron"
+      onClick={open}
+    />
   )
 }
 

@@ -6,6 +6,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.os.SystemClock;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -19,8 +20,6 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Locale;
 
 @CapacitorPlugin(name = "WorkoutNotification")
@@ -141,6 +140,13 @@ public class WorkoutNotificationPlugin extends Plugin {
 
         } else if (WorkoutNotificationReceiver.ACTION_SKIP_REST.equals(action)) {
             eventData.put("action", "skipRest");
+
+        } else if (WorkoutNotificationReceiver.ACTION_ADD_REST_30.equals(action)) {
+            if (currentState != null && currentState.isResting) {
+                currentState.restUntil = Math.max(System.currentTimeMillis(), currentState.restUntil) + 30000L;
+                renderNotification(context, currentState);
+            }
+            eventData.put("action", "addRest30");
         }
 
         if (instance != null) {
@@ -171,6 +177,8 @@ public class WorkoutNotificationPlugin extends Plugin {
         String pkg = context.getPackageName();
         DecimalFormat df = new DecimalFormat("#.##");
         String formattedName = capitalizeWords(s.exerciseName);
+        long now = System.currentTimeMillis();
+        long elapsedRealtimeNow = SystemClock.elapsedRealtime();
 
         // Small view
         RemoteViews smallViews = new RemoteViews(pkg, R.layout.notification_workout_small);
@@ -178,18 +186,28 @@ public class WorkoutNotificationPlugin extends Plugin {
         smallViews.setTextViewText(R.id.notif_small_title, smallTitle);
 
         if (s.isResting) {
-            String restSub = "Descansando";
-            if (s.restUntil > 0) {
-                SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                restSub = "Descanso hasta " + sdf.format(new Date(s.restUntil));
-            }
-            if (s.nextExName != null && !s.nextExName.isEmpty()) {
-                restSub += " · Sig: " + capitalizeWords(s.nextExName);
-            }
-            smallViews.setTextViewText(R.id.notif_small_subtitle, restSub);
             smallViews.setImageViewResource(R.id.notif_small_action, R.drawable.ic_notif_skip);
             smallViews.setOnClickPendingIntent(R.id.notif_small_action, createPendingAction(context, WorkoutNotificationReceiver.ACTION_SKIP_REST, 0));
+
+            if (s.restUntil > now) {
+                long millisRemaining = s.restUntil - now;
+                long baseTime = elapsedRealtimeNow + millisRemaining;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    smallViews.setChronometerCountDown(R.id.notif_small_chronometer, true);
+                }
+                smallViews.setChronometer(R.id.notif_small_chronometer, baseTime, null, true);
+                smallViews.setViewVisibility(R.id.notif_small_chronometer, View.VISIBLE);
+
+                String restSub = (s.nextExName != null && !s.nextExName.isEmpty())
+                    ? (" · Sig: " + capitalizeWords(s.nextExName))
+                    : " · Descanso";
+                smallViews.setTextViewText(R.id.notif_small_subtitle, restSub);
+            } else {
+                smallViews.setViewVisibility(R.id.notif_small_chronometer, View.GONE);
+                smallViews.setTextViewText(R.id.notif_small_subtitle, "Descanso completado");
+            }
         } else {
+            smallViews.setViewVisibility(R.id.notif_small_chronometer, View.GONE);
             String sub = (s.weight > 0 ? (df.format(s.weight) + " " + s.weightUnit + " · ") : "") + s.reps + " reps";
             smallViews.setTextViewText(R.id.notif_small_subtitle, sub);
             smallViews.setImageViewResource(R.id.notif_small_action, R.drawable.ic_notif_check);
@@ -198,31 +216,44 @@ public class WorkoutNotificationPlugin extends Plugin {
 
         // Expanded view
         RemoteViews bigViews = new RemoteViews(pkg, R.layout.notification_workout);
-        bigViews.setTextViewText(R.id.notif_title, formattedName);
-        bigViews.setTextViewText(R.id.notif_set_badge, "Serie " + s.setIndex + "/" + s.totalSets);
 
         if (s.isResting) {
             bigViews.setViewVisibility(R.id.notif_working_container, View.GONE);
             bigViews.setViewVisibility(R.id.notif_resting_container, View.VISIBLE);
 
-            String restTitle = (s.nextExName != null && !s.nextExName.isEmpty())
-                ? "Siguiente: " + s.nextExName
-                : "Descansando entre series";
-            bigViews.setTextViewText(R.id.notif_tv_rest_title, restTitle);
+            String restHeader = (s.nextExName != null && !s.nextExName.isEmpty())
+                ? ("Siguiente: " + capitalizeWords(s.nextExName))
+                : formattedName;
+            bigViews.setTextViewText(R.id.notif_title, restHeader);
+            bigViews.setTextViewText(R.id.notif_set_badge, "Descanso");
 
-            String restSub = "Toca para saltar el temporizador";
-            if (s.restUntil > 0) {
-                SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                restSub = "Descanso hasta las " + sdf.format(new Date(s.restUntil));
+            if (s.restUntil > now) {
+                long millisRemaining = s.restUntil - now;
+                long baseTime = elapsedRealtimeNow + millisRemaining;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    bigViews.setChronometerCountDown(R.id.notif_chronometer, true);
+                }
+                bigViews.setChronometer(R.id.notif_chronometer, baseTime, null, true);
+                bigViews.setViewVisibility(R.id.notif_chronometer, View.VISIBLE);
+
+                String restSub = (s.nextExName != null && !s.nextExName.isEmpty())
+                    ? ("Serie " + s.setIndex + " de " + s.totalSets + " · Próximo ejercicio")
+                    : ("Serie " + s.setIndex + " de " + s.totalSets);
+                bigViews.setTextViewText(R.id.notif_tv_rest_subtitle, restSub);
+            } else {
+                bigViews.setViewVisibility(R.id.notif_chronometer, View.GONE);
+                bigViews.setTextViewText(R.id.notif_tv_rest_subtitle, "Tiempo de descanso cumplido");
             }
-            bigViews.setTextViewText(R.id.notif_tv_rest_subtitle, restSub);
 
-            bigViews.setTextViewText(R.id.notif_btn_main_action, "⏩ Terminar Descanso");
-            bigViews.setOnClickPendingIntent(R.id.notif_btn_main_action, createPendingAction(context, WorkoutNotificationReceiver.ACTION_SKIP_REST, 0));
+            bigViews.setOnClickPendingIntent(R.id.notif_btn_add_time, createPendingAction(context, WorkoutNotificationReceiver.ACTION_ADD_REST_30, 0));
+            bigViews.setOnClickPendingIntent(R.id.notif_btn_skip_rest, createPendingAction(context, WorkoutNotificationReceiver.ACTION_SKIP_REST, 0));
 
         } else {
             bigViews.setViewVisibility(R.id.notif_working_container, View.VISIBLE);
             bigViews.setViewVisibility(R.id.notif_resting_container, View.GONE);
+
+            bigViews.setTextViewText(R.id.notif_title, formattedName);
+            bigViews.setTextViewText(R.id.notif_set_badge, "Serie " + s.setIndex + " de " + s.totalSets);
 
             // Reps Stepper
             bigViews.setTextViewText(R.id.notif_tv_reps, String.valueOf(s.reps));
@@ -240,8 +271,8 @@ public class WorkoutNotificationPlugin extends Plugin {
                 bigViews.setOnClickPendingIntent(R.id.notif_btn_weight_plus, createPendingStepperAction(context, WorkoutNotificationReceiver.ACTION_STEP_WEIGHT, 0, +2.5, 4));
             }
 
-            bigViews.setTextViewText(R.id.notif_btn_main_action, "✔ Completar Serie " + s.setIndex);
-            bigViews.setOnClickPendingIntent(R.id.notif_btn_main_action, createPendingAction(context, WorkoutNotificationReceiver.ACTION_COMPLETE_SET, 0));
+            bigViews.setTextViewText(R.id.notif_btn_complete_set, "Completar Serie " + s.setIndex);
+            bigViews.setOnClickPendingIntent(R.id.notif_btn_complete_set, createPendingAction(context, WorkoutNotificationReceiver.ACTION_COMPLETE_SET, 0));
         }
 
         // Tap on notification body opens main activity

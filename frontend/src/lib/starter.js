@@ -1,14 +1,17 @@
 // Workout program templates (zero axial lumbar load, 100% machines & cables).
 // Includes the default 4-day Upper/Lower program and 4 classic alternate templates.
+// name/shortName/tagline/description/routine names are English source strings — translate
+// at render/instantiation time with t(), never bake a translation in here (see i18n.js).
 import { uid } from './format.js'
+import { t } from './i18n.js'
 
 export const TEMPLATES = [
   {
     id: 'upper-lower',
-    name: 'Upper / Lower (4 días)',
+    name: 'Upper / Lower (4 days)',
     shortName: 'Upper / Lower',
-    tagline: 'Por defecto · 4 días · Freq 2×',
-    description: 'Máxima hipertrofia con 100% máquinas y poleas (cero carga axial lumbar). Frecuencia 2× por grupo.',
+    tagline: 'Default · 4 days · Freq 2×',
+    description: 'Maximum hypertrophy with 100% machines and cables (zero axial lumbar load). 2× frequency per muscle group.',
     emoji: 'barbell',
     daysCount: 4,
     freq: '2×',
@@ -16,7 +19,7 @@ export const TEMPLATES = [
     week: { 1: 0, 2: 1, 4: 2, 5: 3 },
     routines: [
       [
-        'Torso A (Empuje)',
+        'Upper A (Push)',
         'barbell',
         [
           ['0577', 3, 8, { repsMin: 8, repsMax: 10, restSec: 150 }],  // Press pecho horizontal máquina convergente (2.5 min)
@@ -30,7 +33,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Pierna A (Cuádriceps)',
+        'Lower A (Quads)',
         'legs',
         [
           ['0739', 4, 8, { repsMin: 8, repsMax: 10, restSec: 180 }],  // Prensa piernas inclinada 45° (3 min)
@@ -44,7 +47,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Torso B (Tracción)',
+        'Upper B (Pull)',
         'pullup',
         [
           ['0861', 3, 10, { repsMin: 10, repsMax: 12, restSec: 120, side: true }], // Remo unilateral polea baja (2 min)
@@ -59,7 +62,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Pierna B (Isquios)',
+        'Lower B (Hamstrings)',
         'legs',
         [
           ['0599', 4, 8, { repsMin: 8, repsMax: 10, restSec: 120 }],   // Curl femoral sentado (2 min)
@@ -77,17 +80,17 @@ export const TEMPLATES = [
   },
   {
     id: 'ppl',
-    name: 'Push / Pull / Legs (PPL - 6 días)',
+    name: 'Push / Pull / Legs (PPL - 6 days)',
     shortName: 'Push / Pull / Legs',
-    tagline: '6 días · Freq 2× · Alto volumen',
-    description: 'División empuje, tracción y piernas 2 veces por semana. Diseñada 100% en máquinas y poleas.',
+    tagline: '6 days · Freq 2× · High volume',
+    description: 'Push, pull and legs split trained 2× per week. Designed 100% around machines and cables.',
     emoji: 'figureStrength',
     daysCount: 6,
     freq: '2×',
     week: { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 },
     routines: [
       [
-        'Push A (Empuje)',
+        'Push A',
         'barbell',
         [
           ['0577', 3, 6, { repsMin: 6, repsMax: 8, restSec: 150 }],  // Press pecho horizontal máquina convergente (2.5 min)
@@ -99,7 +102,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Pull A (Tracción)',
+        'Pull A',
         'pullup',
         [
           ['2330', 3, 8, { repsMin: 8, repsMax: 10, restSec: 150 }],  // Jalón al pecho agarre prono (2.5 min)
@@ -111,7 +114,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Legs A (Pierna)',
+        'Legs A',
         'legs',
         [
           ['0739', 3, 6, { repsMin: 6, repsMax: 8, restSec: 180 }],   // Prensa piernas 45° (3 min)
@@ -123,7 +126,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Push B (Empuje)',
+        'Push B',
         'barbell',
         [
           ['1299', 3, 6, { repsMin: 6, repsMax: 8, restSec: 150 }],  // Press pecho inclinado en máquina (2.5 min)
@@ -135,7 +138,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Pull B (Tracción)',
+        'Pull B',
         'pullup',
         [
           ['0818', 3, 6, { repsMin: 6, repsMax: 8, restSec: 150 }],   // Jalón agarre neutro (2.5 min)
@@ -147,7 +150,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Legs B (Pierna)',
+        'Legs B',
         'legs',
         [
           ['0599', 3, 6, { repsMin: 6, repsMax: 8, restSec: 120 }],   // Curl femoral sentado (2 min)
@@ -162,10 +165,10 @@ export const TEMPLATES = [
   },
   {
     id: 'full-body',
-    name: 'Full Body (3 días)',
+    name: 'Full Body (3 days)',
     shortName: 'Full Body',
-    tagline: '3 días · Freq 3× · Alta eficiencia',
-    description: 'Cuerpo completo en 3 sesiones alternadas (Lunes, Miércoles, Viernes). Ideal para agendas ocupadas.',
+    tagline: '3 days · Freq 3× · High efficiency',
+    description: 'Full body across 3 alternating sessions (Monday, Wednesday, Friday). Ideal for busy schedules.',
     emoji: 'bolt',
     daysCount: 3,
     freq: '3×',
@@ -212,17 +215,17 @@ export const TEMPLATES = [
   },
   {
     id: 'arnold',
-    name: 'Arnold Split (6 días)',
+    name: 'Arnold Split (6 days)',
     shortName: 'Arnold Split',
-    tagline: '6 días · Freq 2× · Antagonistas',
-    description: 'El esquema clásico de Arnold con Pecho/Espalda, Hombros/Brazos y Piernas, adaptado 100% a máquinas.',
+    tagline: '6 days · Freq 2× · Antagonists',
+    description: 'The classic Arnold split — Chest/Back, Shoulders/Arms and Legs — adapted 100% to machines.',
     emoji: 'arm',
     daysCount: 6,
     freq: '2×',
     week: { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 },
     routines: [
       [
-        'Pecho + Espalda A',
+        'Chest + Back A',
         'barbell',
         [
           ['0577', 4, 6, { repsMin: 6, repsMax: 8, restSec: 150 }],   // Press pecho horizontal convergente (2.5 min)
@@ -234,7 +237,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Hombros + Brazos A',
+        'Shoulders + Arms A',
         'arms',
         [
           ['0603', 4, 6, { repsMin: 6, repsMax: 8, restSec: 150 }],   // Press hombro sentado máquina (2.5 min)
@@ -247,7 +250,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Pierna A',
+        'Legs A',
         'legs',
         [
           ['0739', 4, 6, { repsMin: 6, repsMax: 8, restSec: 180 }],   // Prensa piernas inclinada 45° (3 min)
@@ -259,7 +262,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Pecho + Espalda B',
+        'Chest + Back B',
         'barbell',
         [
           ['1299', 4, 6, { repsMin: 6, repsMax: 8, restSec: 150 }],   // Press pecho inclinado en máquina (2.5 min)
@@ -271,7 +274,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Hombros + Brazos B',
+        'Shoulders + Arms B',
         'arms',
         [
           ['0603', 4, 8, { repsMin: 8, repsMax: 10, restSec: 150 }],  // Press hombro en máquina (2.5 min)
@@ -284,7 +287,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Pierna B',
+        'Legs B',
         'legs',
         [
           ['0599', 4, 8, { repsMin: 8, repsMax: 10, restSec: 120 }],   // Curl femoral sentado (2 min)
@@ -299,17 +302,17 @@ export const TEMPLATES = [
   },
   {
     id: 'weider',
-    name: 'Weider / Bro Split (5 días)',
+    name: 'Weider / Bro Split (5 days)',
     shortName: 'Weider Split',
-    tagline: '5 días · Freq 1× · Culturismo clásico',
-    description: 'Pecho, Espalda, Hombros, Piernas y Brazos. 1 grupo muscular por día con máximo estímulo localizado.',
+    tagline: '5 days · Freq 1× · Classic bodybuilding',
+    description: 'Chest, Back, Shoulders, Legs and Arms. One muscle group per day with maximum localized stimulus.',
     emoji: 'dumbbell',
     daysCount: 5,
     freq: '1×',
     week: { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 },
     routines: [
       [
-        'Pecho (Lunes)',
+        'Chest (Monday)',
         'barbell',
         [
           ['0577', 4, 6, { repsMin: 6, repsMax: 8, restSec: 150 }],   // Press pecho horizontal convergente (2.5 min)
@@ -319,7 +322,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Espalda (Martes)',
+        'Back (Tuesday)',
         'pullup',
         [
           ['2330', 4, 8, { repsMin: 8, repsMax: 10, restSec: 120 }],  // Jalón al pecho agarre prono (2 min)
@@ -330,7 +333,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Hombros + Trapecio (Miércoles)',
+        'Shoulders + Traps (Wednesday)',
         'shoulders',
         [
           ['0603', 4, 8, { repsMin: 8, repsMax: 10, restSec: 150 }],  // Press hombro sentado máquina (2.5 min)
@@ -341,7 +344,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Piernas (Jueves)',
+        'Legs (Thursday)',
         'legs',
         [
           ['0739', 4, 6, { repsMin: 6, repsMax: 8, restSec: 180 }],   // Prensa piernas inclinada 45° (3 min)
@@ -353,7 +356,7 @@ export const TEMPLATES = [
         ]
       ],
       [
-        'Brazos (Viernes)',
+        'Arms (Friday)',
         'arms',
         [
           ['0194', 3, 8, { repsMin: 8, repsMax: 10, restSec: 90 }],   // Extensión tríceps overhead polea (1.5 min)
@@ -375,7 +378,7 @@ export function instantiateTemplate(templateOrId) {
 
   const routines = tpl.routines.map(([name, emoji, list]) => ({
     id: uid(),
-    name,
+    name: t(name),
     emoji: emoji || 'barbell',
     prog: 'double',
     ex: list.map(([id, sets, repsOrSec, extra]) => {
@@ -405,7 +408,7 @@ export function instantiateTemplate(templateOrId) {
 
   const split = {
     id: uid(),
-    name: tpl.name,
+    name: t(tpl.name),
     emoji: tpl.emoji || 'barbell',
     week
   }

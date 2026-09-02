@@ -72,7 +72,7 @@ describe('onboarding logic', () => {
       expect(updated.bodyweight[0]).toEqual({ d: '2026-09-01', w: 78, t: 123456789 })
       expect(updated.targetW).toBe(74) // 78 * 0.95 = 74.1 -> 74.0
       expect(updated.routines).toHaveLength(4) // Upper/Lower 4-day starter routines
-      expect(updated.routines[0].name).toBe('Torso A (Empuje)')
+      expect(updated.routines[0].name).toBe('Upper A (Push)')
     })
 
     it('does not overwrite existing routines if present', () => {

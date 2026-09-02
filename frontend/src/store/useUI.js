@@ -123,6 +123,8 @@ if (MOBILE && typeof WorkoutNotification?.addListener === 'function') {
       } else if (event.action === 'skipRest') {
         useUI.getState().stopRest()
         syncWorkoutNotification()
+      } else if (event.action === 'addRest30') {
+        useUI.getState().addRest(30)
       }
     }).catch(() => {})
   } catch (e) {}

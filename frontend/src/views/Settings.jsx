@@ -138,20 +138,30 @@ export default function Settings() {
           options={[{ value: 'dark', label: t('Dark') }, { value: 'light', label: t('Light') }]}
           value={S.theme || 'dark'} onChange={v => update(s => { s.theme = v })} />
       </Row>
-      <Row icon="palette" iconTint="var(--acc)" title={t('Accent color')}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {Object.entries(ACCENTS).map(([key, col]) => (
-            <button key={key} onClick={() => update(s => { s.accent = key })}
-              aria-label={key}
-              style={{
-                width: 26, height: 26, borderRadius: '50%', background: col, border: 'none', cursor: 'pointer',
-                outline: (S.accent || 'lime') === key ? '3px solid var(--fg)' : 'none',
-                outlineOffset: 2,
-              }}
-            />
-          ))}
-        </div>
-      </Row>
+      <SelectRow
+        icon="palette"
+        iconTint="var(--acc)"
+        title={t('Accent color')}
+        sheetTitle={t('Accent color')}
+        value={S.accent || 'lime'}
+        onChange={v => update(s => { s.accent = v })}
+        renderValue={cur => (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 14, height: 14, borderRadius: '50%', background: ACCENTS[S.accent || 'lime'], display: 'inline-block', boxShadow: '0 0 0 1px rgba(255,255,255,0.2)' }} />
+            <span>{cur ? cur.label : (S.accent || 'lime')}</span>
+          </span>
+        )}
+        options={[
+          { value: 'lime', label: t('Lime'), swatch: ACCENTS.lime },
+          { value: 'sky', label: t('Sky'), swatch: ACCENTS.sky },
+          { value: 'orange', label: t('Orange'), swatch: ACCENTS.orange },
+          { value: 'violet', label: t('Violet'), swatch: ACCENTS.violet },
+          { value: 'pink', label: t('Pink'), swatch: ACCENTS.pink },
+          { value: 'red', label: t('Red'), swatch: ACCENTS.red },
+          { value: 'teal', label: t('Teal'), swatch: ACCENTS.teal },
+          { value: 'gold', label: t('Gold'), swatch: ACCENTS.gold },
+        ]}
+      />
       <SelectRow
         icon="image" iconTint="var(--teal)" title={t('Demonstration animations')}
         value={S.gifSize || 'full'} onChange={v => update(s => { s.gifSize = v })}

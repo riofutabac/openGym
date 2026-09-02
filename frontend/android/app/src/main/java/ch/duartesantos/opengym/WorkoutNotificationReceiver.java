@@ -9,6 +9,7 @@ public class WorkoutNotificationReceiver extends BroadcastReceiver {
     public static final String ACTION_STEP_WEIGHT = "ch.duartesantos.opengym.ACTION_STEP_WEIGHT";
     public static final String ACTION_COMPLETE_SET = "ch.duartesantos.opengym.ACTION_COMPLETE_SET";
     public static final String ACTION_SKIP_REST = "ch.duartesantos.opengym.ACTION_SKIP_REST";
+    public static final String ACTION_ADD_REST_30 = "ch.duartesantos.opengym.ACTION_ADD_REST_30";
 
     @Override
     public void onReceive(Context context, Intent intent) {
