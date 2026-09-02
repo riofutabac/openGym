@@ -26,11 +26,18 @@ Column types below are the ones the app is actually deployed with:
    | `ts` | bigint | no |
    | `settings` | text | no |
    | `routines` | mediumtext | no |
+   | `splits` | mediumtext | no |
+   | `activeSplitId` | string(64) | no |
    | `week` | text | no |
    | `dayPlan` | mediumtext | no |
    | `exWeights` | mediumtext | no |
    | `customEx` | mediumtext | no |
    | `bodyweight` | mediumtext | no |
+
+   `splits` and `activeSplitId` hold the multi-split scheduling model: each split is a
+   named weekly container of reusable routines, `activeSplitId` points at whichever one
+   is currently driving the Home screen. `week` stays for backward compatibility — it
+   mirrors the active split's schedule and is what older client versions read.
 
    - **Row security**: enabled.
    - **Table permissions**: `create("users")` only.

@@ -4,24 +4,23 @@
 
 <br>
 
-**A self-hosted gym & body-weight tracker you actually own.**
+**A self-hosted gym & workout tracker you actually own.**
 
-Plan your week, run guided workouts, track every set and your body weight over time —
-on your phone, synced across devices, powered by Appwrite or standalone on your device.
-No subscription, no ads, no telemetry.
+Plan your week, run guided workouts, track every set, and monitor your body weight over time.<br>
+Enhanced fork by **[Rio Futaba](https://github.com/riofutabac)** with native Android controls, real-time live notification countdowns, multi-split scheduling, and modern Appwrite BaaS sync.
+
+<br>
+
+> 🔀 **This is a fork.** It builds on [DuarteSantos8/openGym](https://github.com/DuarteSantos8/openGym) — full credit for the original concept and codebase to Duarte Santos. This fork adds a native Android app, an Appwrite backend you can self-host, a reworked Split/Routine scheduling model, and a full UI pass. See [Credits](#contributing--credits) for the complete breakdown.
 
 <br>
 
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-a3e635?style=flat-square)](LICENSE)
-![Self-hosted](https://img.shields.io/badge/self--hosted-%F0%9F%8F%A0-60a5fa?style=flat-square)
-![PWA](https://img.shields.io/badge/PWA-installable-a78bfa?style=flat-square)
-![React](https://img.shields.io/badge/React-19-38bdf8?style=flat-square&logo=react&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)
-![No tracking](https://img.shields.io/badge/telemetry-none-f472b6?style=flat-square)
-<br>
-![GitHub last commit](https://img.shields.io/github/last-commit/DuarteSantos8/openGym?style=flat-square)
-[![GitHub stars](https://img.shields.io/github/stars/DuarteSantos8/openGym?style=flat-square)](https://github.com/DuarteSantos8/openGym/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/DuarteSantos8/openGym?style=flat-square)](https://github.com/DuarteSantos8/openGym/issues)
+![Android Native](https://img.shields.io/badge/Android-APK%20%7C%20Capacitor-3DDC84?style=flat-square&logo=android&logoColor=white)
+![Appwrite BaaS](https://img.shields.io/badge/Backend-Appwrite-FD366E?style=flat-square&logo=appwrite&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-38bdf8?style=flat-square&logo=react&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker-compose-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Zero Telemetry](https://img.shields.io/badge/telemetry-none-f472b6?style=flat-square)
 
 </div>
 
@@ -30,129 +29,184 @@ No subscription, no ads, no telemetry.
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="assets/screenshots/home.png" alt="Home" width="230"><br><sub><b>Home</b> — today's workout & weight</sub></td>
-<td align="center"><img src="assets/screenshots/workout.png" alt="Workout" width="230"><br><sub><b>Guided workout</b> — animated demos & sets</sub></td>
-<td align="center"><img src="assets/screenshots/stats.png" alt="Stats" width="230"><br><sub><b>Stats</b> — heatmap, charts & PRs</sub></td>
+  <td align="center" width="33%"><img src="assets/screenshots/homeOpenGym.png" alt="Home Dashboard" width="220"><br><sub><b>Home Dashboard</b><br>Weekly plan, smart rest days & weigh-ins</sub></td>
+  <td align="center" width="33%"><img src="assets/screenshots/splitsOpenGym.png" alt="Splits Manager" width="220"><br><sub><b>Multi-Split Manager</b><br>Create, switch & activate schedules</sub></td>
+  <td align="center" width="33%"><img src="assets/screenshots/TemplateSplitOpenGym.png" alt="Predefined Templates" width="220"><br><sub><b>Workout Templates</b><br>Upper/Lower, PPL & curated routines</sub></td>
+</tr>
+<tr>
+  <td align="center" width="33%"><img src="assets/screenshots/ScreenExerciseOpenGym.png" alt="Active Workout" width="220"><br><sub><b>Active Workout</b><br>Live timers, steppers & RPE/RIR effort</sub></td>
+  <td align="center" width="33%"><img src="assets/screenshots/ExercisesOpenGym.png" alt="Exercise Library" width="220"><br><sub><b>Exercise Library</b><br>1,324 exercises with HD animations</sub></td>
+  <td align="center" width="33%"><img src="assets/screenshots/StatsOpenGym.png" alt="Analytics & Stats" width="220"><br><sub><b>Stats & Muscle Map</b><br>Heatmap, 1RM curves & target recovery</sub></td>
 </tr>
 </table>
 </div>
 
-<div align="center">
+---
 
-### [🌐 opengym.duarte-santos.ch](https://opengym.duarte-santos.ch) · [▶ Try the live demo](https://duartesantos8.github.io/openGym/)
+## Why this Fork?
 
-No signup, nothing to install — it runs entirely in your browser on example data.<br>
-<sub>There's no server behind the demo, so authentication and multi-device sync run on your own Appwrite instance or local storage.</sub>
+Most fitness apps lock your training data behind paywalls, cloud subscriptions, intrusive ads, or proprietary formats. 
 
-</div>
+This enhanced fork builds upon openGym's solid foundation to deliver a **first-class native mobile experience on Android**, seamless **Appwrite BaaS backend support**, and an intuitive, robust routine scheduling engine:
 
-## Why
+- 📱 **Interactive Android Notification with Native Live Chronometer**  
+  Real-time countdown directly on your lock screen and notification shade using Android's native `Chronometer` (no battery drain). Includes fast actions: `+30s` rest extension, `Start set` / `Skip rest`, weight & rep steppers, and set completion—all with clean typography and zero emojis.
+- 🗓️ **True Multi-Split Engine & Smart Calendar**  
+  Manage multiple training splits (Upper/Lower 4-day, Push/Pull/Legs, Full Body) with one-tap activation. Unassigned split days are automatically recognized as rest days on your Home calendar, and deleting a split cleans up orphaned routines both locally and in the cloud.
+- ⏱️ **Unified Rest & Advisory Work Timer**  
+  A single, distraction-free bottom floating timer bar with a live countdown, progress track, and quick `+30s` button. Timed sets (planks, hangs, isometric holds) sound an alert when you reach your target, but keep counting in real-time so your exact overtime is recorded when you tap *Done*.
+- ☁️ **Appwrite BaaS (Cloud or Self-Hosted)**  
+  Granular per-session workout rows and profile documents in Appwrite Databases / TablesDB with strict Row-Level Security (`Role.user(uid)`). Includes a durable offline sync queue and on-device LRU media cache for HD GIF animations.
+- 🎨 **Impeccable UI & Customization**  
+  Sleek dark theme, clean typography, modal accent color picker with live swatches, screen wake lock during training, and 12 localized languages (including Spanish, English, German, French, and more).
 
-Most workout apps lock your data behind a login on their servers, nag you to upgrade, or
-disappear when the startup does. openGym is the opposite: **it runs on your box or device,
-your data is strictly yours, and it's free and open source.** It still feels modern — installable
-as a home-screen app, offline support with durable sync, native rest alarms, and multi-device sync.
+---
 
 ## Features
 
-- ⚖️ **Body-weight tracking** — interactive chart with a goal line you set, gains/losses colored by whether they move toward it
-- 🏋️ **Weekly plan** — a routine per weekday, over a library of **1,324 exercises** (searchable, with animated demos)
-- 🗓️ **Reschedule any day** — sick, missed a session, or fewer gym days this week? Move a workout to another day without touching your weekly plan
-- ▶️ **Guided workouts** — it knows what day it is and starts today's session; asks your body weight first, pre-fills your weights from last time, rest timer, PR detection, per-exercise weight tracking
-- ☀️ **The screen stays awake while you train** — no unlocking the phone and finding your place again between every set. On for as long as a workout is running, released the moment you finish it, and switchable off in Settings
-- 🔗 **Supersets** — build them, and log them back-to-back with a rest only after the pair
-- ⏱️ **Timed exercises** — planks, hangs, wall sits and loaded carries are logged by time, not reps, with a work timer that counts the set itself (separate from the rest timer) and logs the time you actually held. They can carry weight too
-- 📈 **Progression that follows a rule** — pick one per routine, override it per exercise: linear, **Greyskull LP** (AMRAP top set, double jumps, 10 % resets), double progression through a rep range, or adding time. Your weights are already right when the session opens, and every target says *why* it's that number. Missed reps never advance the load, stalls trigger a deload, and bodyweight exercises progress in reps instead
-- 💪 **Estimated 1RM** — per exercise, from your best eligible set (it names which one), with its own progress curve and a calculator for sets you haven't done. Won't guess above 12 reps
-- 🎯 **Effort per set, in your scale** — an optional third column rating how hard a set was, as **RIR** (reps left in the tank) or **RPE** (the same judgement on a 10-point scale). Off by default; each set keeps the scale it was logged with, and nothing else reads the value — your progression and 1RM are unaffected
-- 💪 **Bodyweight exercises, logged as bodyweight** — push-ups, pull-ups, dips and 300-odd others arrive knowing they carry no load, so there's no weight column and no working-weight prompt: one stepper, log the reps. Add a dip belt and it reads as an addition, and progression goes back to following the weight. Without one, reps climb — and past a ceiling you set, a set is added instead of a rep, up to the point where the honest advice is load or a harder variation
-- ↔️ **Reps per side** — for lunges, single-arm rows and the rest. You log the total, the app shows the split ("8 per side"), and the target steps in twos so it never lands on a number one side can't have
-- 🏃 **Cardio** — log time + speed, not just weight × reps
-- 📤 **Share a plan** — send someone your routines and week schedule as a small file (no workouts, no weigh-ins), or print it as a clean PDF. Importing merges, so their plan is never overwritten
-- 🔧 **Filter by equipment** — narrow the library to what you actually own; the options adapt to what you've picked, so every combination on screen has results behind it
-- ✨ **Your own exercises** — a name and a body part is enough; they behave like built-in ones everywhere, with an optional description instead of an animation
-- 🟩 **Activity heatmap** — a GitHub-style year view, shaded by time spent training
-- 💪 **Muscle map** — a front-and-back body diagram shaded by how much work each muscle got, over a week, a month or all time. It names the muscles you *haven't* trained in that period, previews what a routine hits while you build it, and shows what you just trained when you finish. Male or female figure, your pick
-- 🔔 **Native rest notifications & sticky workout card** — rest-timer alarms that fire with sound/vibration even when your phone is locked or WebView is suspended, plus lock-screen actions (`+15s`, `Skip rest`) and a silent persistent status card
-- 🎨 **Designed, not assembled** — light/dark themes and 8 accent colors saved to your profile, over a hand-drawn icon set instead of emoji, so it looks the same on every phone
-- 🌍 **12 languages** — full UI translation (EN, DE, ES, FR, IT, PT, PL, TR, RU, ZH, KO, HI); exercise instructions localized in 10 of them, loaded on demand so the app stays fast
-- 📥 **Bring your history with you** — import from **FitNotes** (Android and iOS), **Strong** and **Hevy**, or body weight straight out of an **Apple Health** export. Exercise names are matched against the library and anything unrecognised becomes one of your own exercises, so nothing in the file is dropped
-- 📦 **Yours to keep** — one-tap JSON export/import, guest mode, **no telemetry**
-- 📱 **Standalone Android app** — the whole tracker as a sideloadable APK: works fully offline, durable sync queue against Appwrite, native workout reminders ([download](https://opengym.duarte-santos.ch))
+### Workout Execution & Tracking
+- **Interactive Guided Workout** — Today's session auto-loads with previous weights, target reps, rest timer, and PR detection.
+- **Screen Wake Lock** — Keeps your screen awake while you train; automatically releases when you finish.
+- **Effort Rating (RIR / RPE)** — Rate your sets with Reps in Reserve (0–4) or Rate of Perceived Exertion (6–10).
+- **Bodyweight-Aware Steppers** — Push-ups, dips, and pull-ups log reps only, with optional added weight (`+10 kg`).
+- **Timed Exercises** — Advisory work timer for planks and holds that accurately captures early stops or overtime.
+- **Supersets & Cardio** — Group exercises back-to-back with rest only after the pair; log duration and speed for cardio.
+- **Estimated 1RM** — Calculated per exercise from your best eligible set with progress curves and an offline calculator.
 
-## Quick start (self-host)
+### Scheduling & Exercises
+- **Multi-Split Management** — Store multiple routines and switch your active split anytime with one click.
+- **Template Library** — Pre-loaded with science-based routines (e.g. 4-day zero axial load Upper/Lower, PPL, Arnold).
+- **Day Overrides** — Sick, traveling, or missed a day? Swap or mark any calendar day as rest without modifying your weekly plan.
+- **1,324 Exercises** — Full library searchable by name, muscle group, or equipment (barbell, cable, dumbbell, machine, bodyweight).
+- **Custom Exercises** — Create your own custom exercises; seamlessly integrated into splits and stats.
 
-You need [Docker](https://docs.docker.com/get-docker/) with Compose.
+### Analytics & Data Ownership
+- **Activity Heatmap** — GitHub-style yearly training consistency grid.
+- **Muscle Recovery Map** — Front and back anatomical figures colored by training volume over the week, month, or all-time.
+- **Import from Other Apps** — One-tap migration from **Hevy**, **Strong**, **FitNotes**, or Apple Health.
+- **Complete Data Export** — Instant JSON backup and restore. No telemetry, no analytics, no external tracking.
 
+---
+
+## Quick Start: Android APK
+
+You can build and deploy the standalone native Android app directly to your device via [Capacitor](https://capacitorjs.com/):
+
+### Prerequisites
+- Node.js 20+
+- Android Studio / Android SDK (with `platform-tools` in your `PATH`)
+
+### Build & Install
 ```bash
-git clone https://github.com/DuarteSantos8/openGym
-cd openGym
-cp .env.example .env
-docker compose pull   # grab prebuilt web image (amd64 + arm64) — or build from source
-docker compose up -d
+# 1. Clone repository
+git clone https://github.com/riofutabac/openGym.git
+cd openGym/frontend
+
+# 2. Install dependencies
+npm install
+
+# 3. Build web assets & sync Capacitor
+npm run build:mobile
+
+# 4. Assemble debug APK
+cd android
+./gradlew assembleDebug
+
+# 5. Install to connected device (via USB / ADB)
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Open **http://localhost:8080**, sign in or create an account, and you're in. To build the images locally instead of pulling from `ghcr.io`, run `docker compose up -d --build`.
+The APK is generated at:  
+`frontend/android/app/build/outputs/apk/debug/app-debug.apk`
 
-For Appwrite configuration and backend setup, see **[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)**.
+For the notification/Chronometer plugin internals, deep-link handling, and native Android specifics, see **[docs/MOBILE.md](docs/MOBILE.md)**. For how the pieces fit together (state store, sync queue, backend adapter), see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
-## Mobile app (Android APK)
+---
 
-The same codebase builds a **native Android app** (Capacitor) with offline storage, durable background sync, and OS-level alarms:
+## Backend Setup: Appwrite BaaS
 
-- **Android:** [**download the APK**](https://opengym.duarte-santos.ch) and sideload it — openGym is deliberately not on the Play Store. Or build it yourself: **[docs/MOBILE.md](docs/MOBILE.md)**.
-- **iOS:** Add it to your home screen from Safari (it's a full PWA), or build the native app onto your own device from Xcode — see **[docs/MOBILE.md](docs/MOBILE.md)**.
+openGym supports running 100% offline (guest mode) or backed by **[Appwrite](https://appwrite.io/)** — either their managed Cloud, or a self-hosted Appwrite instance on your own server. Nothing here depends on Appwrite's cloud specifically; point `VITE_APPWRITE_ENDPOINT` at any Appwrite deployment you control.
 
-## How it's built
+### Environment Configuration
+Copy `frontend/.env.example` to `frontend/.env`:
 
-- **frontend/** — React 19 + Vite (React Router + Zustand), with domain-isolated backend adapters under `src/lib/backend/`.
-- **Appwrite Backend** — Appwrite Cloud / Self-hosted instance with TablesDB collections (`profiles`, `workouts`) and row-level document security.
-- **Mobile (Android)** — Capacitor native build communicating with Appwrite, native local notification channels, and persistent offline sync queue.
+```env
+# Enable Appwrite backend
+VITE_APPWRITE=1
 
-## Your data
+# Appwrite Cloud is regional — use your project's region (e.g. sfo, fra, nyc), not the
+# generic cloud.appwrite.io URL, which returns 401 "Project is not accessible in this
+# region". Self-hosting Appwrite yourself? Point this at your own instance's URL instead.
+VITE_APPWRITE_ENDPOINT=https://<region>.cloud.appwrite.io/v1
 
-Workouts and profiles are stored in **Appwrite Databases / TablesDB** under `profiles` (settings, routines, plan, weigh-ins) and `workouts` (one immutable row per workout session). Row-level document security (`Permission.read/update/delete(Role.user(uid))`) guarantees that each user's data is strictly isolated.
+# Your Appwrite project & database ID
+VITE_APPWRITE_PROJECT_ID=your_project_id_here
+VITE_APPWRITE_DATABASE_ID=opengym
 
-## Configuration
+# Media storage bucket for exercise GIFs (optional)
+VITE_APPWRITE_BUCKET_ID=exercises
+```
 
-All configured via `frontend/.env` (see `frontend/.env.example`):
+### Database Schema
+Appwrite Databases uses two tables:
+1. **`profiles`** — one row per user: settings, splits, active split, routines, bodyweight entries, and unit preferences.
+2. **`workouts`** — granular, append-only rows, one per completed workout session.
 
-| Variable | What it is | Example |
-|---|---|---|
-| `VITE_APPWRITE` | Enables Appwrite backend | `1` |
-| `VITE_APPWRITE_ENDPOINT` | Regional Appwrite Cloud endpoint | `https://sfo.cloud.appwrite.io/v1` |
-| `VITE_APPWRITE_PROJECT_ID` | Your Appwrite project ID | `6a904b0d003e4351232f` |
-| `VITE_APPWRITE_DATABASE_ID` | Appwrite database ID | `opengym` |
-| `VITE_APPWRITE_OAUTH_PROVIDER` | Optional OAuth provider | `google` |
+Row security is enforced per user with Appwrite permissions, so on a shared instance one account can never read another's data:
+```javascript
+[
+  Permission.read(Role.user(userId)),
+  Permission.update(Role.user(userId)),
+  Permission.delete(Role.user(userId)),
+]
+```
 
-## Tech
+For the exact column list/types, the storage bucket setup, and full step-by-step deployment (including self-hosted Appwrite), see **[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)**.
 
-React 19 + Vite (React Router, Zustand) · Appwrite · nginx · Docker Compose ·
-exercise data from [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset).
-The frontend builds inside Docker, so self-hosting stays a one-command `docker compose up`.
+---
 
-The training logic — progression rules, 1RM estimation, how a logged session is read back —
-lives in pure functions under `frontend/src/lib/` with tests next to them: `npm test` in
-`frontend/`. Vitest is a dev dependency; the app itself ships no runtime dependencies beyond
-React, the router, Zustand, and Appwrite SDK.
+## Web & Docker Self-Hosting
 
-## Community
+You can also run openGym as a web application or Progressive Web App (PWA):
 
-- **[Q&A](https://github.com/DuarteSantos8/openGym/discussions/categories/q-a)** — self-hosting help, Appwrite setup, "how do I…".
-- **[Ideas](https://github.com/DuarteSantos8/openGym/discussions/categories/ideas)** — features worth talking through before anyone writes code.
-- **[Show and tell](https://github.com/DuarteSantos8/openGym/discussions/categories/show-and-tell)** — your setup, your plan templates, whatever you built on top.
-- **[Issues](https://github.com/DuarteSantos8/openGym/issues)** — bugs, and work that's already been agreed on.
+### Local Development Server
+```bash
+cd frontend
+npm install
+npm run dev
+# Open http://localhost:5173
+```
 
-## Contributing
+### Docker Compose
+```bash
+docker compose up -d --build
+# Open http://localhost:8080
+```
 
-Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Good first issues: more starter
-plans, exercise-data languages, import from other trackers. **A ⭐ helps more people find it.**
+---
 
-openGym is free and stays free: AGPL, no subscription, no paid tier, nothing held back for
-sponsors.
+## Tech Stack
+
+- **UI Framework:** React 19, React Router, Zustand
+- **Build Tool:** Vite
+- **Mobile Engine:** Capacitor 7 (Android SDK 34+)
+- **Backend / BaaS:** Appwrite Databases, Auth & Storage
+- **Testing:** Vitest (370+ unit tests, run on every session with `npm test`)
+- **Styling:** Custom CSS with CSS variables, dark mode & dynamic theme tokens
+
+---
+
+## Contributing & Credits
+
+Contributions, issues, and ideas are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md).
+
+- **Original Creator:** [Duarte Santos](https://github.com/DuarteSantos8/openGym)
+- **Enhanced Fork & Mobile Overhaul:** [Rio Futaba](https://github.com/riofutabac)
+- **Exercise Dataset:** [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset)
+
+---
 
 ## License
 
-[GNU AGPL v3.0](LICENSE) — free and open source.
-
-Exercise images/GIFs are fetched from the upstream dataset and keep their own terms — see [NOTICE.md](NOTICE.md).
+This project is licensed under the [GNU AGPL v3.0](LICENSE).  
+Exercise animations and instructional assets remain subject to their respective original licenses (see [NOTICE.md](NOTICE.md)).
